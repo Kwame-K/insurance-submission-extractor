@@ -109,7 +109,7 @@ class ExtractionResult(BaseModel):
     submission: InsuranceSubmission
     missing_fields: list[str] = Field(default_factory=list)
     data_quality_flags: list[DataQualityFlag] = Field(default_factory=list)
-    extraction_confidence: Annotated[float, Field(ge=0, le=1)]
+    extraction_confidence: Annotated[float | None, Field(ge=0, le=1)] = None
     extraction_notes: list[str] = Field(default_factory=list)
     provider: str
     model: str

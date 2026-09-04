@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from google import genai
+from google.genai import types
 from pydantic import ValidationError
 
 from insurance_submission_extractor.config import Settings
@@ -37,20 +38,13 @@ class GeminiClient:
         try:
             response = self._client.models.generate_content(
                 model=self.model,
-                contents=[
-                    {
-                        "role": "user",
-                        "parts": [{"text": (f"{SYSTEM_INSTRUCTIONS}\n\n{prompt}")}],
-                    }
-                ],
-                config={
-                    "response_format": {
-                        "text": {
-                            "mime_type": "application/json",
-                            "schema": InsuranceSubmission.model_json_schema(),
-                        }
-                    }
-                },
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_INSTRUCTIONS,
+                    response_mime_type="application/json",
+                    response_json_schema=InsuranceSubmission.model_json_schema(),
+                    temperature=0,
+                ),
             )
         except Exception as error:
             raise LLMClientError(f"Gemini request failed for model '{self.model}'.") from error
