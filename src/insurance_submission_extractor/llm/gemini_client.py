@@ -44,6 +44,9 @@ class GeminiClient:
                     response_mime_type="application/json",
                     response_json_schema=InsuranceSubmission.model_json_schema(),
                     temperature=0,
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                        disable=True,
+                    ),
                 ),
             )
         except Exception as error:
