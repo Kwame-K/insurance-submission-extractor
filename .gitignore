@@ -13,3 +13,4 @@ wheels/
 .coverage
 .env
 *.egg-info/
+data/evaluations/*.json
