@@ -12,6 +12,8 @@ Follow these rules:
 - Use empty lists when no list values are explicitly provided.
 - Use Canadian dollar amounts for monetary values when the source indicates CAD.
 - Normalize Canadian province names to two-letter province codes when possible.
+- Do not infer location_province from location_city alone.
+- Do not infer postal_code from a city, business name, or other location details.
 - Use only the allowed enum values for product lines, coverage types, and claim types.
 - Preserve factual accuracy over completeness.
 - Extract business_activity whenever the business operation is explicitly stated.
@@ -19,6 +21,10 @@ Follow these rules:
   business activity descriptions when they describe the insured.
 - Map an explicit request for commercial property insurance or commercial property
   coverage to product_line "commercial_property".
+  - Map explicit property coverage, property insurance, or property damage coverage
+  to requested_coverages value "property_damage".
+- Commercial property insurance alone identifies product_line but does not, by itself,
+  imply a requested_coverages value.
 - Do not infer requested_coverages from product_line alone.
 - Preserve the most specific business activity wording provided in the source.
 - Set claims_history_status to "losses_reported" when one or more claims are stated.

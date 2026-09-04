@@ -24,3 +24,10 @@ def test_system_instructions_define_extraction_policies() -> None:
     assert 'product_line "commercial_property"' in SYSTEM_INSTRUCTIONS
     assert "Do not infer requested_coverages" in SYSTEM_INSTRUCTIONS
     assert 'claims_history_status to "no_losses_reported"' in SYSTEM_INSTRUCTIONS
+
+
+def test_system_instructions_define_location_and_coverage_policies() -> None:
+    assert "Do not infer location_province from location_city alone." in (SYSTEM_INSTRUCTIONS)
+    assert "Do not infer postal_code from a city" in SYSTEM_INSTRUCTIONS
+    assert 'requested_coverages value "property_damage"' in SYSTEM_INSTRUCTIONS
+    assert "Commercial property insurance alone identifies product_line" in (SYSTEM_INSTRUCTIONS)

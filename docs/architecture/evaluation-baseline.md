@@ -36,8 +36,7 @@ extractor before provider comparison and automated evaluation are introduced.
 ## Findings
 
 - A syntactically valid structured response does not guarantee semantic completeness.
-- Claims history requires an explicit status to distinguish no losses reported
-  from missing claims information.
+- Claims history requires an explicit status to distinguish no losses reported from missing claims information.
 - Deterministic validation rules successfully detected an impossible temporal
   relationship between a building construction year and a prior claim.
 - Business activity and occupancy type must remain separate concepts.
@@ -60,3 +59,39 @@ extractor before provider comparison and automated evaluation are introduced.
 - Groq inferred property_damage from commercial property insurance, which requires a stricter prompt policy.
 - Deterministic Python validation produced consistent risk flags regardless of the provider.
 - Structured output guarantees output shape, not field-level factual correctness.
+
+## Ground Truth Refinement
+
+The retail incomplete case was updated after review because the source text mentions Montreal but does not explicitly provide a province. The expected location_province value is therefore null, and the field must be reported as missing.
+
+The evaluation policy distinguishes between:
+- explicit geographic information, which can be extracted and normalized;
+- geographic information inferred from common knowledge, which must not be added;
+- explicit coverage wording, which can be mapped to controlled coverage values;
+- product line wording alone, which must not automatically create coverage requests.
+
+## Multi-Run Provider Stability Evaluation
+
+Both providers were evaluated three times against the four-case synthetic
+insurance submission golden dataset.
+
+| Provider | Model | Completed Runs | Passed Cases | Total Cases | Pass Rate |
+|---|---|---:|---:|---:|---:|
+| Gemini | gemini-3.7-flash | 3 | 11 | 12 | 91.7% |
+| Groq | openai/gpt-oss-120b | 3 | 12 | 12 | 100.0% |
+
+## Observed Gemini Failure
+
+Gemini intermittently omitted the property_damage coverage from the
+restaurant_complete case, despite explicit property coverage wording in the
+source submission.
+
+This failure occurred once across three runs.
+
+## Current Provider Decision
+
+For the current MVP and the current synthetic benchmark:
+- Groq / openai/gpt-oss-120b is the preferred primary extraction provider.
+- Gemini / gemini-3.7-flash remains a supported alternative provider.
+- Provider choice remains configurable through environment variables.
+- The provider comparison must be repeated after every significant prompt, schema, dataset, or model change.
