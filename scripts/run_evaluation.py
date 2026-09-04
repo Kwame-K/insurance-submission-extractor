@@ -6,14 +6,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
 
+from insurance_submission_extractor.config import LLMProvider, Settings
 from insurance_submission_extractor.evaluation import (
     CaseEvaluation,
     GoldenCase,
     evaluate_extraction_result,
     load_golden_cases,
 )
-
-from insurance_submission_extractor.config import LLMProvider, Settings
 from insurance_submission_extractor.llm import create_llm_client
 from insurance_submission_extractor.services import SubmissionExtractor
 
@@ -48,7 +47,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     return parser
-
 
 
 def evaluate_case(
