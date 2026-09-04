@@ -17,3 +17,10 @@ def test_extraction_prompt_contains_submission_id_and_text() -> None:
 def test_system_instructions_prohibit_hallucinated_data() -> None:
     assert "Do not infer, estimate, or invent" in SYSTEM_INSTRUCTIONS
     assert "Do not make underwriting decisions." in SYSTEM_INSTRUCTIONS
+
+
+def test_system_instructions_define_extraction_policies() -> None:
+    assert "business_activity" in SYSTEM_INSTRUCTIONS
+    assert 'product_line "commercial_property"' in SYSTEM_INSTRUCTIONS
+    assert "Do not infer requested_coverages" in SYSTEM_INSTRUCTIONS
+    assert 'claims_history_status to "no_losses_reported"' in SYSTEM_INSTRUCTIONS

@@ -82,4 +82,5 @@ def test_extractor_requires_review_for_incomplete_submission() -> None:
     assert result.review_required is True
     assert "postal_code" in result.missing_fields
     assert "building_construction_year" in result.missing_fields
-    assert "occupancy_type" in result.missing_fields
+    assert "occupancy_type" not in result.missing_fields
+    assert result.submission.occupancy_type == "retail store"

@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from insurance_submission_extractor.llm import LLMClient
 from insurance_submission_extractor.schemas import ExtractionResult
+from insurance_submission_extractor.services.normalizers import (
+    normalize_submission,
+)
 from insurance_submission_extractor.services.validators import validate_submission
 
 
@@ -18,6 +21,7 @@ class SubmissionExtractor:
             submission_text=submission_text,
             submission_id=submission_id,
         )
+        submission = normalize_submission(submission)
 
         validation_report = validate_submission(submission)
 
