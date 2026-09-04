@@ -140,6 +140,7 @@ class ExtractionResult(BaseModel):
     provider: str
     model: str
     processed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    review_required: bool
 
 
 class ValidationReport(BaseModel):

@@ -29,4 +29,5 @@ class SubmissionExtractor:
             extraction_notes=[],
             provider=self._llm_client.provider,
             model=self._llm_client.model,
+            review_required=validation_report.review_required,
         )

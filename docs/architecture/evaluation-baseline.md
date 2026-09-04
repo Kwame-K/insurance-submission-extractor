@@ -41,3 +41,22 @@ extractor before provider comparison and automated evaluation are introduced.
 - Deterministic validation rules successfully detected an impossible temporal
   relationship between a building construction year and a prior claim.
 - Business activity and occupancy type must remain separate concepts.
+
+## Provider Comparison
+
+| Case ID | Scenario | Gemini Result | Groq Result | Notes |
+|---|---|---|---|---|
+| SUB-2026-0001 | Complete restaurant property submission | Passed | Partially passed | Groq returned null for occupancy_type; policy decision required on activity-to-occupancy normalization. |
+| SUB-2026-0002 | Incomplete retail property submission | Passed | Partially passed | Groq inferred property_damage from the product line although no explicit coverage was requested. |
+| SUB-2026-0003 | Inconsistent warehouse submission | Passed | Passed | Both providers extracted the underlying facts; deterministic validation raised BUILDING_YEAR_AFTER_CLAIM. |
+| SUB-2026-0004 | Cyber submission | Passed after claims-history refinement | Partially passed | Groq correctly identified no_losses_reported but failed to extract the explicit data consulting business activity. |
+
+## Provider Findings
+
+- Both providers produced schema-valid Pydantic-compatible outputs.
+- Provider outputs differ despite an identical prompt, schema, and synthetic source file.
+- Gemini extracted business_activity more consistently in the evaluated cyber case.
+- Groq followed a more conservative strategy for occupancy_type in the restaurant case.
+- Groq inferred property_damage from commercial property insurance, which requires a stricter prompt policy.
+- Deterministic Python validation produced consistent risk flags regardless of the provider.
+- Structured output guarantees output shape, not field-level factual correctness.
