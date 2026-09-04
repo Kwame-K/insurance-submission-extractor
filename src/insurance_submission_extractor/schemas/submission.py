@@ -114,3 +114,9 @@ class ExtractionResult(BaseModel):
     provider: str
     model: str
     processed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class ValidationReport(BaseModel):
+    missing_fields: list[str] = Field(default_factory=list)
+    data_quality_flags: list[DataQualityFlag] = Field(default_factory=list)
+    review_required: bool

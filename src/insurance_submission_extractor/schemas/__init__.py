@@ -7,6 +7,7 @@ from insurance_submission_extractor.schemas.submission import (
     ExtractionResult,
     InsuranceSubmission,
     ProductLine,
+    ValidationReport,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "ExtractionResult",
     "InsuranceSubmission",
     "ProductLine",
+    "ValidationReport",
 ]
