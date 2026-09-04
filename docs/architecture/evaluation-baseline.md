@@ -20,10 +20,11 @@ extractor before provider comparison and automated evaluation are introduced.
 
 | Case ID | Scenario | Expected Outcome | Status |
 |---|---|---|---|
-| SUB-2026-0001 | Complete restaurant property submission | Structured extraction with no quality flags | Pending |
-| SUB-2026-0002 | Incomplete retail property submission | Missing fields detected and review required | Pending |
-| SUB-2026-0003 | Inconsistent warehouse submission | Building year after claim flag detected | Pending |
-| SUB-2026-0004 | Cyber submission | Cyber classification without property requirements | Pending |
+| SUB-2026-0001 | Complete restaurant property submission | Structured extraction with no quality flags | Passed |
+| SUB-2026-0002 | Incomplete retail property submission | Missing fields detected and review required | Passed |
+| SUB-2026-0003 | Inconsistent warehouse submission | Building year after claim flag detected | Passed |
+| SUB-2026-0004 | Cyber submission | Cyber classification without property requirements | Passed after claims-history status refinement |
+
 
 ## Notes
 
@@ -31,3 +32,12 @@ extractor before provider comparison and automated evaluation are introduced.
 - Manual evaluations must document factual extraction errors.
 - A valid JSON response does not prove factual accuracy.
 - Provider comparisons must use identical source submissions.
+
+## Findings
+
+- A syntactically valid structured response does not guarantee semantic completeness.
+- Claims history requires an explicit status to distinguish no losses reported
+  from missing claims information.
+- Deterministic validation rules successfully detected an impossible temporal
+  relationship between a building construction year and a prior claim.
+- Business activity and occupancy type must remain separate concepts.

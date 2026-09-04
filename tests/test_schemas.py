@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from insurance_submission_extractor.schemas import (
     ClaimRecord,
+    ClaimsHistoryStatus,
     ClaimType,
     CoverageType,
     InsuranceSubmission,
@@ -57,6 +58,39 @@ def test_submission_rejects_future_claim_year() -> None:
             claims_history=[
                 ClaimRecord(
                     year=future_year,
+                    claim_type=ClaimType.FIRE,
+                    amount_cad=10_000,
+                )
+            ],
+        )
+
+
+def test_submission_marks_claims_as_reported_when_claims_exist() -> None:
+    submission = InsuranceSubmission(
+        submission_id="SUB-2026-0030",
+        claims_history=[
+            ClaimRecord(
+                year=2024,
+                claim_type=ClaimType.FIRE,
+                amount_cad=10_000,
+            )
+        ],
+    )
+
+    assert submission.claims_history_status == ClaimsHistoryStatus.LOSSES_REPORTED
+
+
+def test_submission_rejects_claims_when_no_losses_are_reported() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="Claims history cannot contain records",
+    ):
+        InsuranceSubmission(
+            submission_id="SUB-2026-0031",
+            claims_history_status=ClaimsHistoryStatus.NO_LOSSES_REPORTED,
+            claims_history=[
+                ClaimRecord(
+                    year=2024,
                     claim_type=ClaimType.FIRE,
                     amount_cad=10_000,
                 )

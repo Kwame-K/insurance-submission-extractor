@@ -1,5 +1,6 @@
 from insurance_submission_extractor.schemas import (
     ClaimRecord,
+    ClaimsHistoryStatus,
     ClaimType,
     CoverageType,
     InsuranceSubmission,
@@ -100,3 +101,24 @@ def test_validation_detects_duplicate_claims() -> None:
     report = validate_submission(submission)
 
     assert any(flag.code == "POSSIBLE_DUPLICATE_CLAIMS" for flag in report.data_quality_flags)
+
+
+def test_validation_does_not_flag_explicitly_reported_no_losses() -> None:
+    submission = InsuranceSubmission(
+        submission_id="SUB-2026-0032",
+        product_line=ProductLine.CYBER,
+        business_activity="Data consulting",
+        location_city="Montreal",
+        location_province="QC",
+        postal_code="H3B 2Y5",
+        employee_count=35,
+        annual_revenue_cad=4_200_000,
+        requested_coverages=[CoverageType.CYBER_LIABILITY],
+        claims_history_status=ClaimsHistoryStatus.NO_LOSSES_REPORTED,
+    )
+
+    report = validate_submission(submission)
+
+    assert report.missing_fields == []
+    assert report.data_quality_flags == []
+    assert report.review_required is False

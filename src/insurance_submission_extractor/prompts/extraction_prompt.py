@@ -17,6 +17,12 @@ Follow these rules:
 - Do not make underwriting decisions.
 - Do not recommend, accept, decline, or price coverage.
 - Do not claim that the absence of a reported claim means that no claims occurred.
+- Set claims_history_status to "losses_reported" when one or more claims are stated.
+- Set claims_history_status to "no_losses_reported" when the submission explicitly
+  states that there are no prior claims, losses, or incidents.
+- Set claims_history_status to "not_provided" 
+ when the submission does not mention claims, losses, or incidents.
+
 """.strip()
 
 

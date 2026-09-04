@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 
 from insurance_submission_extractor.schemas import (
+    ClaimsHistoryStatus,
     DataQualityFlag,
     DataQualitySeverity,
     InsuranceSubmission,
@@ -117,7 +118,7 @@ def validate_submission(submission: InsuranceSubmission) -> ValidationReport:
                     code="BUILDING_YEAR_AFTER_CLAIM",
                     message=(
                         "Building construction year is later than the most recent"
-                        "reported claim year."
+                        " reported claim year."
                     ),
                 )
             )
@@ -139,7 +140,7 @@ def validate_submission(submission: InsuranceSubmission) -> ValidationReport:
             )
         )
 
-    if not submission.claims_history:
+    if submission.claims_history_status == ClaimsHistoryStatus.NOT_PROVIDED:
         flags.append(
             DataQualityFlag(
                 field="claims_history",

@@ -1,5 +1,6 @@
 from insurance_submission_extractor.schemas.submission import (
     ClaimRecord,
+    ClaimsHistoryStatus,
     ClaimType,
     CoverageType,
     DataQualityFlag,
@@ -20,4 +21,5 @@ __all__ = [
     "InsuranceSubmission",
     "ProductLine",
     "ValidationReport",
+    "ClaimsHistoryStatus",
 ]

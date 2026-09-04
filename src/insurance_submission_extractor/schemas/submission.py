@@ -35,6 +35,12 @@ class ClaimType(StrEnum):
     OTHER = "other"
 
 
+class ClaimsHistoryStatus(StrEnum):
+    NOT_PROVIDED = "not_provided"
+    NO_LOSSES_REPORTED = "no_losses_reported"
+    LOSSES_REPORTED = "losses_reported"
+
+
 class DataQualitySeverity(StrEnum):
     INFO = "info"
     WARNING = "warning"
@@ -69,6 +75,7 @@ class InsuranceSubmission(BaseModel):
     annual_revenue_cad: Annotated[float | None, Field(ge=0)] = None
     requested_coverages: list[CoverageType] = Field(default_factory=list)
     claims_history: list[ClaimRecord] = Field(default_factory=list)
+    claims_history_status: ClaimsHistoryStatus = ClaimsHistoryStatus.NOT_PROVIDED
     source_language: str = "en"
 
     @field_validator("location_province")
@@ -101,6 +108,25 @@ class InsuranceSubmission(BaseModel):
         for claim in self.claims_history:
             if claim.year > current_year:
                 raise ValueError("Claim year cannot be in the future.")
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_claim_history(self) -> InsuranceSubmission:
+        current_year = datetime.now(UTC).year
+
+        for claim in self.claims_history:
+            if claim.year > current_year:
+                raise ValueError("Claim year cannot be in the future.")
+
+        if self.claims_history_status == ClaimsHistoryStatus.NOT_PROVIDED and self.claims_history:
+            self.claims_history_status = ClaimsHistoryStatus.LOSSES_REPORTED
+
+        if (
+            self.claims_history_status == ClaimsHistoryStatus.NO_LOSSES_REPORTED
+            and self.claims_history
+        ):
+            raise ValueError("Claims history cannot contain records when no losses are reported.")
 
         return self
 
