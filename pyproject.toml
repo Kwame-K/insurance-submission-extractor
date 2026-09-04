@@ -1,7 +1,7 @@
 [project]
 name = "insurance-submission-extractor"
 version = "0.1.0"
-description = "Add your description here"
+description = "A provider-agnostic LLM service for extracting structured commercial insurance submissions."
 readme = "README.md"
 authors = [
     { name = "Kristian", email = "kristian.klaban@gmail.com" }
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-insurance-submission-extractor = "insurance_submission_extractor:main"
+insurance-submission-extractor = "insurance_submission_extractor.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]
@@ -28,3 +28,15 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.16.6",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
