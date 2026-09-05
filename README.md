@@ -398,6 +398,6 @@ This project is intended for educational and portfolio purposes. Add a license a
 
 Built by Kristian Laban.
 
-- GitHub: [@your-github-username](https://github.com/Kwame-K)
-- LinkedIn: [Your LinkedIn profile](https://www.linkedin.com/in/kwame-kristian-laban/)
+- GitHub: [@Kwame-K](https://github.com/Kwame-K)
+- LinkedIn: [Kwame Kristian LABAN](https://www.linkedin.com/in/kwame-kristian-laban/)
 
