@@ -72,6 +72,10 @@ The application does not make underwriting decisions, accept or decline risks, o
                 Golden Dataset Evaluation Runner
 ```
 
+For a detailed architecture description, component responsibilities, sequence
+diagrams, evaluation flow, and future underwriting workflow, see
+[System Architecture](docs/architecture/system-architecture.md).
+
 ## Project Structure
 
 ```text
