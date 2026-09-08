@@ -139,7 +139,7 @@ insurance-submission-extractor/
 ### Installation
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/Kwame-K/insurance-submission-extractor.git
 cd insurance-submission-extractor
 uv sync --all-groups
 ```
