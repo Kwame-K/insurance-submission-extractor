@@ -1,0 +1,12 @@
+services:
+  insurance-submission-extractor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: insurance-submission-extractor:local
+    container_name: insurance-submission-extractor
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped

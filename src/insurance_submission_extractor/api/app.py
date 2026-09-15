@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request, Response, status
 
 from insurance_submission_extractor.config import Settings
 from insurance_submission_extractor.llm import LLMClientError, create_llm_client
@@ -17,12 +17,7 @@ from insurance_submission_extractor.schemas.integration import (
 )
 from insurance_submission_extractor.services import SubmissionExtractor
 
-
-class Extractor(Protocol):
-    """Minimal interface required by the HTTP layer."""
-
-    def extract(self, submission_text: str, submission_id: str) -> object:
-        """Extract and validate one insurance submission."""
+CORRELATION_ID_HEADER = "X-Correlation-ID"
 
 
 def get_extractor(request: Request) -> SubmissionExtractor:
@@ -82,10 +77,27 @@ def create_app() -> FastAPI:
     )
     app.state.extractor = None
 
+    @app.middleware("http")
+    async def add_correlation_id(
+        request: Request,
+        call_next: object,
+    ) -> Response:
+        """Propagate or generate a correlation identifier for every request."""
+        correlation_id = request.headers.get(CORRELATION_ID_HEADER, str(uuid4()))
+        request.state.correlation_id = correlation_id
+
+        response = await call_next(request)
+        response.headers[CORRELATION_ID_HEADER] = correlation_id
+
+        return response
+
     @app.get("/health", tags=["Operations"])
-    def health() -> dict[str, str]:
+    def health(request: Request) -> dict[str, str]:
         """Return service availability without calling an LLM provider."""
-        return {"status": "ok"}
+        return {
+            "status": "ok",
+            "correlation_id": request.state.correlation_id,
+        }
 
     @app.post(
         "/v1/extract-submission",
@@ -117,6 +129,7 @@ def create_app() -> FastAPI:
                     "source_id": payload.source_id,
                     "error_code": "LLM_PROVIDER_ERROR",
                     "error_message": str(error),
+                    "correlation_id": request.state.correlation_id,
                 },
             ) from error
 

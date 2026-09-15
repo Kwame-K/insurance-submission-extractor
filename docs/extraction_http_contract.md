@@ -137,3 +137,16 @@ The consumer must:
 •	Route any response with  review_required: true  to an appropriate review workflow.
 •	Store provider, model, timestamp, source identifier, and contract version for audit.
 •	Avoid treating  COMPLETE  as a policy, pricing, eligibility, or binding decision.
+
+
+
+## Correlation ID
+
+The consumer should generate an `X-Correlation-ID` header for every request.
+
+The service returns the same value in the `X-Correlation-ID` response header.
+If the header is omitted, the service generates a UUID and returns it.
+
+The consumer must propagate the same correlation identifier when it calls
+downstream services. This enables end-to-end tracing across Project 1,
+Project 3, and Project 4.

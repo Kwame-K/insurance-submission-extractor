@@ -277,6 +277,53 @@ The validation layer identifies:
 
 The `review_required` field is a routing signal for a future human-in-the-loop underwriting workflow.
 
+## HTTP API
+
+Start the API locally:
+
+```bash
+uv run uvicorn insurance_submission_extractor.api.app:app --reload
+```
+The service is available at  http://127.0.0.1:8000 .
+
+| Endpoint                    | Purpose                                                                      |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| GET /health                 | Confirms that the API process is running                                     |
+| POST /v1/extract-submission | Extracts and validates candidate data from a text-based insurance submission |
+| GET /docs                   | Interactive OpenAPI documentation                                            |
+
+
+The API contract is documented in docs/extraction_http_contract.md .
+The consumer should send an  X-Correlation-ID  header. The service propagates the same value in its response header; when omitted, it generates a UUID.
+This allows Project 4 to trace one request across Project 1 and Project 3.
+
+## Docker
+
+Build and start the service:
+
+```bash
+docker compose up --build
+```
+Run it in the background:
+
+```bash
+docker compose up --build -d
+```
+Verify health:
+
+```bash
+curl -i \
+  -H "X-Correlation-ID: docker-health-001" \
+  http://127.0.0.1:8000/health
+```
+Stop the service:
+
+```bash
+docker compose down
+```
+
+
+
 ## Evaluation
 
 The application includes a versioned JSONL golden dataset containing synthetic insurance submissions and expected outputs.

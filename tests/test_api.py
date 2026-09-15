@@ -71,7 +71,10 @@ def test_health_returns_ok() -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    payload = response.json()
+
+    assert payload["status"] == "ok"
+    assert payload["correlation_id"] == response.headers["X-Correlation-ID"]
 
 
 def test_extract_submission_returns_complete_http_contract() -> None:
@@ -126,3 +129,39 @@ def test_extract_submission_returns_bad_gateway_when_provider_fails() -> None:
     assert payload["detail"]["source_id"] == "SRC-BROKER-EMAIL-001"
     assert payload["detail"]["error_code"] == "LLM_PROVIDER_ERROR"
     assert payload["detail"]["error_message"] == "Provider is unavailable."
+
+
+def test_health_returns_provided_correlation_id() -> None:
+    client = TestClient(create_app())
+
+    response = client.get(
+        "/health",
+        headers={"X-Correlation-ID": "workflow-2026-0001"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["X-Correlation-ID"] == "workflow-2026-0001"
+    assert response.json()["correlation_id"] == "workflow-2026-0001"
+
+
+def test_health_generates_correlation_id_when_missing() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.headers["X-Correlation-ID"]
+    assert response.json()["correlation_id"] == response.headers["X-Correlation-ID"]
+
+
+def test_extraction_returns_provided_correlation_id() -> None:
+    client = create_test_client(SubmissionExtractor(FakeLLMClient()))
+
+    response = client.post(
+        "/v1/extract-submission",
+        json=valid_payload(),
+        headers={"X-Correlation-ID": "workflow-2026-0002"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["X-Correlation-ID"] == "workflow-2026-0002"
