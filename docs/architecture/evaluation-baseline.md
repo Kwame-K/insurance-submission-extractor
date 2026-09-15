@@ -91,7 +91,20 @@ This failure occurred once across three runs.
 ## Current Provider Decision
 
 For the current MVP and the current synthetic benchmark:
-- Groq / openai/gpt-oss-120b is the preferred primary extraction provider.
-- Gemini / gemini-3.7-flash remains a supported alternative provider.
+
+- Primary provider: Gemini / gemini-3.7-flash
+- Fallback candidate: Groq / openai/gpt-oss-120b
+- Gemini stability: 12/12 passed across 3 runs (100.0%).
+- Groq stability: 15/16 passed across 4 runs (93.75%).
+- Decision rationale: Gemini achieved stable completeness on the current benchmark.
 - Provider choice remains configurable through environment variables.
-- The provider comparison must be repeated after every significant prompt, schema, dataset, or model change.
+- The provider comparison must be repeated after every significant prompt, schema,
+  dataset, or model change.
+
+## Limitations
+
+- The current benchmark contains only four synthetic cases.
+- A valid structured response does not guarantee factual correctness.
+- Before production use, extend the golden dataset with anonymized or representative
+  broker submissions, additional incomplete cases, ambiguous locations, multiple
+  locations, claims-history variations, and adversarial inputs.
