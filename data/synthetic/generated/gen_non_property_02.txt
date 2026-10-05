@@ -1,0 +1,11 @@
+INSURANCE SUBMISSION FORM
+
+Product: cyber insurance
+Insured: Granite Peak Law LLP
+Business activity: law firm
+Location: Sherbrooke, Quebec J0N 6B8
+Year built: 1991
+Employees: 6
+Annual revenue: CAD 780,000
+Coverages requested: cyber liability
+Claims history: N/A

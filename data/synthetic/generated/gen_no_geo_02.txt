@@ -1,0 +1,11 @@
+INSURANCE SUBMISSION FORM
+
+Product: commercial property insurance
+Insured: Northern Crate Logistics
+Business activity: warehouse
+Location: Calgary
+Year built: 2008
+Employees: 5
+Annual revenue: $2,500,000
+Coverages requested: property damage
+Claims history: None in the last 5 years

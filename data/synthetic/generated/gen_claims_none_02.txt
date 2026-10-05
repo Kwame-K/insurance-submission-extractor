@@ -1,0 +1,11 @@
+INSURANCE SUBMISSION FORM
+
+Product: commercial property insurance
+Insured: Harbourfront Hardware
+Business activity: retail store
+Location: Laval, Quebec H2A 6J2
+Year built: 1990
+Employees: 59
+Annual revenue: CAD 1,200,000
+Coverages requested: property damage; business interruption
+Claims history: None in the last 5 years

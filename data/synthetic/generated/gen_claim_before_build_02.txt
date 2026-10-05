@@ -1,0 +1,11 @@
+INSURANCE SUBMISSION FORM
+
+Product: commercial property insurance
+Insured: Chez Marcel Bistro
+Business activity: restaurant
+Location: Vancouver, British Columbia V4A 9C5
+Year built: 2022
+Employees: 44
+Annual revenue: CAD 2,500,000
+Coverages requested: property damage; business interruption
+Claims history: 2017 water damage ($15,000)
