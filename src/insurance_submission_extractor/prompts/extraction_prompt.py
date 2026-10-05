@@ -21,10 +21,16 @@ Follow these rules:
   business activity descriptions when they describe the insured.
 - Map an explicit request for commercial property insurance or commercial property
   coverage to product_line "commercial_property".
-  - Map explicit property coverage, property insurance, or property damage coverage
-  to requested_coverages value "property_damage".
+- Return every coverage the submission names, not only the first one. When several
+  coverages are joined in one request, such as "commercial property and business
+  interruption coverage", return all of them: "property_damage" and
+  "business_interruption".
+- Map explicit property coverage, commercial property coverage, property insurance,
+  building and contents coverage, or property damage coverage to
+  requested_coverages value "property_damage", including when it is listed together
+  with other coverages.
 - Commercial property insurance alone identifies product_line but does not, by itself,
-  imply a requested_coverages value.
+  imply a requested_coverages value when no coverage wording is given.
 - Do not infer requested_coverages from product_line alone.
 - Preserve the most specific business activity wording provided in the source.
 - Set claims_history_status to "losses_reported" when one or more claims are stated.

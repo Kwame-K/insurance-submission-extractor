@@ -42,3 +42,12 @@ def test_normalizer_preserves_explicit_occupancy_type() -> None:
     normalized_submission = normalize_submission(submission)
 
     assert normalized_submission.occupancy_type == "Full-service restaurant with commercial kitchen"
+
+
+def test_french_business_activities_are_normalized() -> None:
+    from insurance_submission_extractor.schemas import InsuranceSubmission
+    from insurance_submission_extractor.services import normalize_submission
+
+    for activity, occupancy in [("Entrepôt", "warehouse"), ("magasin de détail", "retail store")]:
+        submission = InsuranceSubmission(submission_id="X", business_activity=activity)
+        assert normalize_submission(submission).occupancy_type == occupancy

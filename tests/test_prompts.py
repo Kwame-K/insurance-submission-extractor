@@ -31,3 +31,11 @@ def test_system_instructions_define_location_and_coverage_policies() -> None:
     assert "Do not infer postal_code from a city" in SYSTEM_INSTRUCTIONS
     assert 'requested_coverages value "property_damage"' in SYSTEM_INSTRUCTIONS
     assert "Commercial property insurance alone identifies product_line" in (SYSTEM_INSTRUCTIONS)
+
+
+def test_system_instructions_require_all_named_coverages() -> None:
+    from insurance_submission_extractor.prompts.extraction_prompt import SYSTEM_INSTRUCTIONS
+
+    assert "Return every coverage the submission names" in SYSTEM_INSTRUCTIONS
+    assert "commercial property and business" in SYSTEM_INSTRUCTIONS
+    assert "Do not infer requested_coverages from product_line alone" in SYSTEM_INSTRUCTIONS

@@ -7,6 +7,8 @@ OCCUPANCY_BY_BUSINESS_ACTIVITY = {
     "retail store": "retail store",
     "small retail store": "retail store",
     "warehouse": "warehouse",
+    "entrepôt": "warehouse",
+    "magasin de détail": "retail store",
 }
 
 
