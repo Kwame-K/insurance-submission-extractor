@@ -11,6 +11,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "google-genai>=2.22.0",
     "groq>=1.7.0",
+    "mcp>=2,<3",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
     "python-dotenv>=1.2.3",
@@ -19,6 +20,7 @@ dependencies = [
 
 [project.scripts]
 insurance-submission-extractor = "insurance_submission_extractor.cli:main"
+insurance-submission-mcp = "insurance_submission_extractor.mcp_server.server:main"
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]

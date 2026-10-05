@@ -12,8 +12,10 @@ The application transforms unstructured commercial insurance submissions into st
 flowchart TD
     A[Broker Submission<br/>Plain Text] --> B[CLI]
     A --> B2[FastAPI<br/>POST /v1/extract-submission]
+    A --> B3[MCP Server stdio<br/>extract_submission tool]
     B --> C[SubmissionExtractor]
     B2 --> C
+    B3 --> C
 
     C --> D[LLM Factory]
     D --> E[GeminiClient<br/>gemini-3.7-flash]
@@ -33,6 +35,8 @@ flowchart TD
     K --> O[Validated Submission Data]
 
     O --> P[CLI JSON Output]
+    O --> Q2[MCP Tool Result<br/>v1 contract]
+    Q2 --> R2[MCP Client / Agents<br/>Underwriting + RAG]
     O --> Q[HTTP Response<br/>with X-Correlation-ID]
     Q --> R[Underwriting Agent<br/>Project 4]
 ```
@@ -43,6 +47,8 @@ flowchart TD
 |---|---|---:|
 | `cli.py` | Accepts a text submission or input file and prints a JSON result | No |
 | `api/app.py` | Exposes the FastAPI HTTP service (`/health`, `/v1/extract-submission`, `/docs`) with `X-Correlation-ID` propagation | No |
+| `mcp_server/server.py` | Exposes the read-only `extract_submission` MCP tool over stdio; maps provider errors to `LLM_PROVIDER_ERROR` | No |
+| `services/http_adapter.py` | `to_http_result()` converts the domain `ExtractionResult` to the v1 contract, shared by the API and the MCP server | No |
 | `config.py` | Loads validated runtime configuration from environment variables | No |
 | `llm/base.py` | Defines the common LLM client contract | No |
 | `llm/factory.py` | Creates the client selected by `LLM_PROVIDER` | No |
@@ -95,6 +101,29 @@ sequenceDiagram
     Extractor-->>API: ExtractionResult
     API-->>Client: 200 OK + JSON + X-Correlation-ID
 ```
+
+## Extraction Sequence (MCP)
+
+```mermaid
+sequenceDiagram
+    actor Client as MCP Client / Agent
+    participant MCP as MCP Server (mcp_server/server.py)
+    participant Extractor as SubmissionExtractor
+    participant Adapter as http_adapter.to_http_result
+
+    Client->>MCP: call_tool extract_submission(source_id, content)
+    MCP->>Extractor: extract(submission_text, submission_id)
+    Extractor-->>MCP: ExtractionResult
+    MCP->>Adapter: to_http_result(source_id, result)
+    Adapter-->>MCP: v1 contract object
+    MCP-->>Client: JSON tool result
+```
+
+The MCP server is a thin interface layer. It holds no business logic: extraction, normalization, and validation stay in `SubmissionExtractor`, and the output schema is identical to the HTTP API, so there is a single contract to maintain. The extractor instance is created lazily and cached. Logs go to stderr, since stdout carries the stdio protocol. The tool is read-only and idempotent, and makes no underwriting decision.
+
+## Platform Integration
+
+The MCP server is designed to sit next to `insurance-rag-assistant` (`retrieve_evidence`, `search_documents`) in the same MCP client configuration. An orchestrating agent such as the Underwriting Agent can call `extract_submission` for intake, then query the knowledge base for supporting evidence, and remain the sole owner of the decision.
 
 ## Validation Layers
 

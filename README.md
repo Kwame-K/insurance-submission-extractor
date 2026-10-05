@@ -34,6 +34,8 @@ The application does not make underwriting decisions, accept or decline risks, o
 - Explicit distinction between missing claims history and explicitly reported no-loss history
 - `review_required` routing signal for incomplete submissions
 - FastAPI HTTP service (`api/app.py`) with health check and extraction endpoint
+- MCP server (`mcp_server/server.py`, stdio) exposing the `extract_submission` tool to MCP clients and agents
+- Shared HTTP/MCP response adapter (`services/http_adapter.py`) so both interfaces return the same v1 contract
 - `X-Correlation-ID` propagation for cross-service tracing with Project 4
 - Dockerized service with `compose.yaml`
 - Versioned synthetic golden dataset
@@ -47,7 +49,7 @@ The application does not make underwriting decisions, accept or decline risks, o
                                    |
                +-------------------+-------------------+
                v                                       v
-              CLI                              FastAPI (api/app.py)
+              CLI                              FastAPI / MCP server
                |                                       |
                +-------------------+-------------------+
                                    v
@@ -83,7 +85,7 @@ The application does not make underwriting decisions, accept or decline risks, o
               Runner                    X-Correlation-ID)
 ```
 
-For a detailed architecture description, component responsibilities, sequence diagrams, evaluation flow, and future underwriting workflow, see [System Architecture](docs/architecture/system-architecture_updated.md).
+For a detailed architecture description, component responsibilities, sequence diagrams, evaluation flow, and future underwriting workflow, see [System Architecture](docs/architecture/system-architecture.md).
 
 ## Project Structure
 
@@ -110,6 +112,9 @@ insurance-submission-extractor/
 │   └── insurance_submission_extractor/
 │       ├── api/
 │       │   └── app.py
+│       ├── mcp_server/
+│       │   ├── __init__.py
+│       │   └── server.py
 │       ├── llm/
 │       │   ├── base.py
 │       │   ├── factory.py
@@ -122,6 +127,7 @@ insurance-submission-extractor/
 │       │   └── submission.py
 │       ├── services/
 │       │   ├── extractor.py
+│       │   ├── http_adapter.py
 │       │   ├── normalizers.py
 │       │   └── validators.py
 │       ├── cli.py
@@ -134,6 +140,7 @@ insurance-submission-extractor/
 │   ├── test_extractor.py
 │   ├── test_integration_schemas.py
 │   ├── test_llm_factory.py
+│   ├── test_mcp_server.py
 │   ├── test_normalizers.py
 │   ├── test_prompts.py
 │   ├── test_schemas.py
@@ -310,6 +317,48 @@ The service is available at `http://127.0.0.1:8000`.
 
 The API contract is documented in `docs/extraction_http_contract.md`. The consumer should send an `X-Correlation-ID` header; the service propagates the same value in its response header and generates a UUID when omitted. This allows the Underwriting Agent (Project 4) to trace one request across the Submission Extractor and the Insurance Knowledge Agent (Project 3).
 
+## MCP Server
+
+The extractor is also available as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so MCP clients and agents (for example the Underwriting Agent, or a client that also connects to `insurance-rag-assistant`) can call it as a tool. It reuses the same `SubmissionExtractor` and the same v1 response contract as the HTTP API.
+
+Start the server:
+
+```bash
+uv run insurance-submission-mcp
+```
+
+Inspect it interactively:
+
+```bash
+npx @modelcontextprotocol/inspector uv run insurance-submission-mcp
+```
+
+| Tool | Purpose |
+|---|---|
+| `extract_submission` | Extracts candidate structured data from a text-based commercial insurance submission |
+
+`extract_submission` parameters: `source_id` (required, consumer-generated), `content` (required), `language` (default `en`), `source_type` (default `FREE_TEXT`), `document_name` (optional). It returns the v1 contract: `extraction_status`, `submission_data`, `missing_fields`, `data_quality_flags`, `review_required`, `provider`, `model`. The tool is annotated read-only and idempotent. It never accepts, declines, prices, or binds a risk. Provider failures are raised as an error prefixed with `LLM_PROVIDER_ERROR`.
+
+Example client configuration (Claude Desktop, Cursor, or any stdio MCP client):
+
+```json
+{
+  "mcpServers": {
+    "insurance-submission-extractor": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/absolute/path/to/insurance-submission-extractor",
+        "run",
+        "insurance-submission-mcp"
+      ]
+    }
+  }
+}
+```
+
+Provider settings (`LLM_PROVIDER` and API keys) are read from the project `.env` file. Logs are written to stderr because stdout carries the stdio protocol.
+
 ## Docker
 
 ```bash
@@ -414,4 +463,4 @@ This project is Project 1 of a five-project portfolio orchestrated locally throu
 - **Explicit escalation signal**: `review_required` gives a clear, inspectable handoff point to a human reviewer rather than a silent LLM decision.
 - **Provider abstraction as a resilience pattern**: the `LLMClient` protocol allows failover or A/B testing between Gemini and Groq without touching business logic.
 - **Correlation-first design**: propagating `X-Correlation-ID` across services is a foundational practice for auditing multi-agent workflows end to end.
-- **Next-level practice to adopt**: expose this extractor as an MCP-compatible tool so the Underwriting Agent (or any future orchestrator) can call it through a standardized tool contract instead of a bespoke HTTP client, improving interoperability across the platform.
+- **Standardized tool contract**: the extractor is exposed as an MCP tool (`insurance-submission-mcp`) that reuses the HTTP v1 contract, so the Underwriting Agent or any orchestrator can call it without a bespoke HTTP client. Next step: add MCP integration tests with a real client session and an HTTP transport for remote deployment.

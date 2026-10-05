@@ -39,5 +39,15 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+      - name: Run MCP server tests
+        run: uv run pytest tests/test_mcp_server.py -v
+
+      - name: Smoke test MCP server import
+        run: >
+          uv run python -c
+          "from insurance_submission_extractor.mcp_server.server import mcp, main;
+          print('MCP server import OK')"
+
       - name: Build Docker image
         run: docker build --tag insurance-submission-extractor:ci .
