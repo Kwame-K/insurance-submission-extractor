@@ -14,3 +14,4 @@ wheels/
 .env
 *.egg-info/
 data/evaluations/*.json
+logs/

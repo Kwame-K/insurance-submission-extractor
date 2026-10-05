@@ -325,6 +325,18 @@ The service is available at `http://127.0.0.1:8000`.
 
 The API contract is documented in `docs/extraction_http_contract.md`. The consumer should send an `X-Correlation-ID` header; the service propagates the same value in its response header and generates a UUID when omitted. This allows the Underwriting Agent (Project 4) to trace one request across the Submission Extractor and the Insurance Knowledge Agent (Project 3).
 
+## Observability
+
+Every extraction emits one structured record on the `insurance_submission_extractor.extraction` logger. Set `EXTRACTION_LOG_PATH` to also append it as a JSON line to a file. Each record holds metadata only: `submission_id`, `correlation_id` (from `X-Correlation-ID` on the HTTP API), final `provider` and `model`, `duration_ms`, `fallback_used`, `review_required`, `missing_field_count`, the names of `unsupported_fields`, and `error_type` on failure. It never contains submission text, extracted values, evidence excerpts, or provider error messages. A log write failure never interrupts an extraction.
+
+Summarize a log file with:
+
+```bash
+uv run python scripts/summarize_logs.py logs/extractions.jsonl
+```
+
+The summary reports error, fallback, review, and unsupported-value rates, p50/p95/max latency, and per-provider latency for successful runs. Cost and token usage are not recorded yet, and `logs/` should not be committed.
+
 ## MCP Server
 
 The extractor is also available as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so MCP clients and agents (for example the Underwriting Agent, or a client that also connects to `insurance-rag-assistant`) can call it as a tool. It reuses the same `SubmissionExtractor` and the same v1 response contract as the HTTP API.

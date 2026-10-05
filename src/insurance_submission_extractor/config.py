@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from pathlib import Path
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
 
     llm_provider: LLMProvider = LLMProvider.GEMINI
     llm_fallback_provider: LLMProvider | None = None
+    extraction_log_path: Path | None = None
 
     gemini_api_key: SecretStr | None = Field(
         default=None,

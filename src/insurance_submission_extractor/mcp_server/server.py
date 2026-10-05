@@ -32,7 +32,11 @@ def get_extractor() -> SubmissionExtractor:
     """Create and cache the configured extraction service."""
     global _extractor
     if _extractor is None:
-        _extractor = SubmissionExtractor(create_llm_client(Settings()))
+        settings = Settings()
+        _extractor = SubmissionExtractor(
+            create_llm_client(settings),
+            extraction_log_path=settings.extraction_log_path,
+        )
     return _extractor
 
 

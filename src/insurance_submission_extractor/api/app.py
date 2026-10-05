@@ -16,6 +16,7 @@ from insurance_submission_extractor.schemas.integration import (
 )
 from insurance_submission_extractor.services import SubmissionExtractor
 from insurance_submission_extractor.services.http_adapter import to_http_result
+from insurance_submission_extractor.services.telemetry import CORRELATION_ID
 
 CORRELATION_ID_HEADER = "X-Correlation-ID"
 
@@ -26,7 +27,10 @@ def get_extractor(request: Request) -> SubmissionExtractor:
 
     if extractor is None:
         settings = Settings()
-        extractor = SubmissionExtractor(create_llm_client(settings))
+        extractor = SubmissionExtractor(
+            create_llm_client(settings),
+            extraction_log_path=settings.extraction_log_path,
+        )
         request.app.state.extractor = extractor
 
     return extractor
@@ -53,7 +57,11 @@ def create_app() -> FastAPI:
         correlation_id = request.headers.get(CORRELATION_ID_HEADER, str(uuid4()))
         request.state.correlation_id = correlation_id
 
-        response = await call_next(request)
+        token = CORRELATION_ID.set(correlation_id)
+        try:
+            response = await call_next(request)
+        finally:
+            CORRELATION_ID.reset(token)
         response.headers[CORRELATION_ID_HEADER] = correlation_id
 
         return response

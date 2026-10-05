@@ -67,7 +67,10 @@ def main() -> None:
 
         settings = Settings()
         llm_client = create_llm_client(settings)
-        extractor = SubmissionExtractor(llm_client)
+        extractor = SubmissionExtractor(
+            llm_client,
+            extraction_log_path=settings.extraction_log_path,
+        )
 
         result = extractor.extract(
             submission_text=submission_text,
