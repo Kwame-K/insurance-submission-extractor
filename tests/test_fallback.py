@@ -130,21 +130,26 @@ def test_factory_builds_fallback_client_only_when_configured(
     monkeypatch.setattr(factory, "GeminiClient", lambda settings: FakeClient("gemini"))
     monkeypatch.setattr(factory, "GroqClient", lambda settings: FakeClient("groq"))
 
-    single = factory.create_llm_client(Settings(llm_provider=LLMProvider.GEMINI))
+    single = factory.create_llm_client(
+        Settings(_env_file=None, llm_provider=LLMProvider.GEMINI, llm_fallback_provider=None)
+    )
     combined = factory.create_llm_client(
         Settings(
+            _env_file=None,
             llm_provider=LLMProvider.GEMINI,
             llm_fallback_provider=LLMProvider.GROQ,
         )
     )
     same = factory.create_llm_client(
         Settings(
+            _env_file=None,
             llm_provider=LLMProvider.GEMINI,
             llm_fallback_provider=LLMProvider.GEMINI,
         )
     )
 
     assert single.provider == "gemini"
+    assert not isinstance(single, FallbackLLMClient)
     assert isinstance(combined, FallbackLLMClient)
     assert combined.name == "gemini+groq"
     assert same.provider == "gemini"
@@ -154,4 +159,4 @@ def test_factory_builds_fallback_client_only_when_configured(
 def test_fallback_provider_is_read_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_FALLBACK_PROVIDER", "groq")
 
-    assert Settings().llm_fallback_provider == LLMProvider.GROQ
+    assert Settings(_env_file=None).llm_fallback_provider == LLMProvider.GROQ

@@ -10,6 +10,7 @@ def test_factory_creates_gemini_client() -> None:
     settings = Settings(
         _env_file=None,
         llm_provider="gemini",
+        llm_fallback_provider=None,
         gemini_api_key="test-gemini-key",
     )
 
@@ -23,6 +24,7 @@ def test_factory_creates_groq_client() -> None:
     settings = Settings(
         _env_file=None,
         llm_provider="groq",
+        llm_fallback_provider=None,
         groq_api_key="test-groq-key",
     )
 
