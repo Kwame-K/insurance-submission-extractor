@@ -79,7 +79,18 @@ A successful response returns HTTP  200 .
   "missing_fields": [],
   "ambiguous_fields": [],
   "field_confidence": {},
-  "source_references": [],
+  "source_references": [
+    {
+      "field_name": "postal_code",
+      "source_excerpt": "The postal code is H2X 1Y4.",
+      "page_number": null
+    },
+    {
+      "field_name": "annual_revenue_cad",
+      "source_excerpt": "The restaurant has 24 employees and estimated annual revenue of CAD 1,200,000.",
+      "page_number": null
+    }
+  ],
   "data_quality_flags": [],
   "review_required": false,
   "provider": "groq",
@@ -99,15 +110,15 @@ Response fields
 | extraction_status  | COMPLETE , PARTIAL , or FAILED                          |
 | submission_data    | Candidate data only; it is not an underwriting decision |
 | missing_fields     | Required fields not present in the source               |
-| ambiguous_fields   | Fields that require clarification                       |
+| ambiguous_fields   | Extracted fields that no source passage supports        |
 | field_confidence   | Optional confidence values between 0 and 1              |
-| source_references  | Optional source evidence for extracted fields           |
-| data_quality_flags | Deterministic validation findings                       |
+| source_references  | Source passages supporting extracted fields             |
+| data_quality_flags | Deterministic validation and evidence findings          |
 | review_required    | Routing signal for consumer review workflow             |
-| provider           | LLM provider used for the extraction                    |
+| provider           | LLM provider that produced the result (may be fallback) |
 | model              | LLM model used for the extraction                       |
 | processed_at       | UTC timestamp of extraction completion                  |
-| extraction_notes   | Additional extraction notes                             |
+| extraction_notes   | Notes, such as provider fallback or omitted fields      |
 | error_code         | Machine-readable error code, if applicable              |
 | error_message      | Human-readable error message, if applicable             |
 
@@ -115,6 +126,33 @@ Response fields
 COMPLETE  means the service found no required missing fields. It does not prove
 that the submission is eligible, priced, accepted, or free from underwriting risk.
  PARTIAL  means the extraction completed but required information is missing.
+Source evidence
+
+After extraction, the service searches the source text, without calling a model, for
+the passage supporting each extracted value. This is additive behavior: the v1 schema is
+unchanged, and `source_references` and `ambiguous_fields` were already part of it.
+
+-  source_references  holds one entry per supported value. `source_excerpt` is the
+  sentence or form line containing the evidence. `page_number` is always null for
+  text input. A list-valued field such as  requested_coverages  can appear several times.
+-  ambiguous_fields  lists extracted fields that no passage supports, for example a
+  province inferred from a city, an invented revenue, or a year with no construction
+  wording. Each one also adds a  data_quality_flags  entry with code
+   VALUE_NOT_FOUND_IN_SOURCE  and severity  warning , and sets  review_required: true .
+- Matching ignores case and accents and accepts common number formats, such as
+   1,200,000 ,  1 200 000 , and  1.2M . It favors missing a bad value over raising a
+  false alert.
+- Not checked: claims_history_status , source_language , occupancy_type, and the
+  correctness of an insured name or product line beyond finding matching wording.
+
+Absence from  ambiguous_fields  is not proof that a value is correct.
+
+Provider fallback
+
+When a fallback provider is configured, provider  and  model  report the provider that
+produced the result. A fallback result, or an output that still omits explicit source
+fields, sets  review_required: true  and explains why in  extraction_notes .
+
 Errors
 Invalid request
 An invalid request returns HTTP  422 . This includes an empty  content , an
@@ -135,6 +173,8 @@ The consumer must:
 •	Treat  submission_data  as candidate information.
 •	Apply its own canonical validation before persistence or underwriting.
 •	Route any response with  review_required: true  to an appropriate review workflow.
+•	Show  source_excerpt  to reviewers, but do not persist it automatically in long-term audit payloads; it can contain personal or commercial data.
+•	Treat fields listed in  ambiguous_fields  as unverified until a person confirms them.
 •	Store provider, model, timestamp, source identifier, and contract version for audit.
 •	Avoid treating  COMPLETE  as a policy, pricing, eligibility, or binding decision.
 
