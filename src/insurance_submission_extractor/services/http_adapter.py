@@ -7,6 +7,7 @@ from insurance_submission_extractor.schemas.integration import (
 )
 from insurance_submission_extractor.schemas.integration import (
     ExtractionStatus,
+    SourceReference,
 )
 
 
@@ -25,9 +26,15 @@ def to_http_result(source_id: str, extraction_result: object) -> HttpExtractionR
         ),
         submission_data=submission.model_dump(mode="json"),
         missing_fields=missing_fields,
-        ambiguous_fields=[],
+        ambiguous_fields=list(extraction_result.unsupported_fields),
         field_confidence=field_confidence,
-        source_references=[],
+        source_references=[
+            SourceReference(
+                field_name=reference.field_name,
+                source_excerpt=reference.source_excerpt,
+            )
+            for reference in extraction_result.source_references
+        ],
         data_quality_flags=[
             flag.model_dump(mode="json") for flag in extraction_result.data_quality_flags
         ],

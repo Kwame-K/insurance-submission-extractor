@@ -9,6 +9,12 @@ from insurance_submission_extractor.schemas import (
 )
 from insurance_submission_extractor.services import SubmissionExtractor
 
+SOURCE_TEXT = (
+    "We are seeking commercial property and business interruption coverage for a "
+    "restaurant in Montreal, QC H2X 1Y4. The building was constructed in 1998. "
+    "The restaurant has 24 employees and annual revenue of CAD 1,200,000."
+)
+
 
 class FakeLLMClient:
     provider = "fake"
@@ -60,7 +66,7 @@ def valid_payload() -> dict[str, str]:
         "source_id": "SRC-BROKER-EMAIL-001",
         "source_type": "BROKER_EMAIL",
         "document_name": "restaurant-submission.txt",
-        "content": "Please quote commercial property coverage for our restaurant.",
+        "content": SOURCE_TEXT,
         "language": "en",
     }
 
@@ -93,6 +99,11 @@ def test_extract_submission_returns_complete_http_contract() -> None:
     assert payload["submission_data"]["submission_id"] == "SRC-BROKER-EMAIL-001"
     assert payload["submission_data"]["location_province"] == "QC"
     assert payload["review_required"] is False
+    assert {ref["field_name"] for ref in payload["source_references"]} >= {
+        "location_province",
+        "postal_code",
+        "annual_revenue_cad",
+    }
     assert payload["provider"] == "fake"
     assert payload["model"] == "fake-model"
     assert payload["processed_at"] is not None
@@ -165,3 +176,22 @@ def test_extraction_returns_provided_correlation_id() -> None:
 
     assert response.status_code == 200
     assert response.headers["X-Correlation-ID"] == "workflow-2026-0002"
+
+
+def test_unsupported_value_is_flagged_for_review() -> None:
+    class InferringLLMClient(FakeLLMClient):
+        def extract_submission(
+            self, submission_text: str, submission_id: str
+        ) -> InsuranceSubmission:
+            return (
+                super()
+                .extract_submission(submission_text, submission_id)
+                .model_copy(update={"location_province": "ON"})
+            )
+
+    client = create_test_client(SubmissionExtractor(InferringLLMClient()))
+    payload = client.post("/v1/extract-submission", json=valid_payload()).json()
+
+    assert payload["ambiguous_fields"] == ["location_province"]
+    assert payload["review_required"] is True
+    assert any(f["code"] == "VALUE_NOT_FOUND_IN_SOURCE" for f in payload["data_quality_flags"])

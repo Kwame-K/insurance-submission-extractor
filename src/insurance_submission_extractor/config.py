@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     )
 
     llm_provider: LLMProvider = LLMProvider.GEMINI
+    llm_fallback_provider: LLMProvider | None = None
 
     gemini_api_key: SecretStr | None = Field(
         default=None,

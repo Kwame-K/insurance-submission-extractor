@@ -5,6 +5,12 @@ from insurance_submission_extractor.schemas import (
 )
 from insurance_submission_extractor.services import SubmissionExtractor
 
+SOURCE_TEXT = (
+    "We are seeking commercial property and business interruption coverage for a "
+    "restaurant in Montreal, QC H2X 1Y4. The building was constructed in 1998. "
+    "The restaurant has 24 employees and annual revenue of CAD 1,200,000."
+)
+
 
 class FakeLLMClient:
     provider = "fake"
@@ -39,7 +45,7 @@ def test_extractor_returns_validated_result() -> None:
     )
 
     result = extractor.extract(
-        submission_text="Synthetic submission text.",
+        submission_text=SOURCE_TEXT,
         submission_id="SUB-2026-0021",
     )
 

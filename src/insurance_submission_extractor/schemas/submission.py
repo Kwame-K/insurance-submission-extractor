@@ -54,6 +54,11 @@ class DataQualityFlag(BaseModel):
     message: str
 
 
+class FieldEvidence(BaseModel):
+    field_name: str
+    source_excerpt: str
+
+
 class ClaimRecord(BaseModel):
     year: Annotated[int, Field(ge=1900, le=2100)]
     claim_type: ClaimType
@@ -137,6 +142,8 @@ class ExtractionResult(BaseModel):
     data_quality_flags: list[DataQualityFlag] = Field(default_factory=list)
     extraction_confidence: Annotated[float | None, Field(ge=0, le=1)] = None
     extraction_notes: list[str] = Field(default_factory=list)
+    source_references: list[FieldEvidence] = Field(default_factory=list)
+    unsupported_fields: list[str] = Field(default_factory=list)
     provider: str
     model: str
     processed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
