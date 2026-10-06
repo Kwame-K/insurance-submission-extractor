@@ -4,7 +4,7 @@ from groq import Groq
 from pydantic import ValidationError
 
 from insurance_submission_extractor.config import Settings
-from insurance_submission_extractor.llm.base import LLMClientError
+from insurance_submission_extractor.llm.base import LLMClientError, TokenUsage
 from insurance_submission_extractor.prompts import (
     SYSTEM_INSTRUCTIONS,
     build_extraction_prompt,
@@ -29,6 +29,15 @@ class GroqClient:
         submission_text: str,
         submission_id: str,
     ) -> InsuranceSubmission:
+        submission, _ = self.extract_with_usage(submission_text, submission_id)
+
+        return submission
+
+    def extract_with_usage(
+        self,
+        submission_text: str,
+        submission_id: str,
+    ) -> tuple[InsuranceSubmission, TokenUsage | None]:
         prompt = build_extraction_prompt(
             submission_text=submission_text,
             submission_id=submission_id,
@@ -72,8 +81,20 @@ class GroqClient:
                 "Groq returned a response that failed application validation."
             ) from error
 
-        return submission.model_copy(
-            update={
-                "submission_id": submission_id,
-            }
+        return (
+            submission.model_copy(update={"submission_id": submission_id}),
+            self._usage(response),
+        )
+
+    def _usage(self, response: object) -> TokenUsage | None:
+        usage = getattr(response, "usage", None)
+
+        if usage is None:
+            return None
+
+        return TokenUsage(
+            provider=self.provider,
+            model=self.model,
+            input_tokens=int(getattr(usage, "prompt_tokens", None) or 0),
+            output_tokens=int(getattr(usage, "completion_tokens", None) or 0),
         )

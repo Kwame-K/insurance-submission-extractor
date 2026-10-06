@@ -2,6 +2,7 @@ from insurance_submission_extractor.llm.base import (
     ExtractionRunInfo,
     LLMClient,
     LLMClientError,
+    TokenUsage,
 )
 from insurance_submission_extractor.llm.completeness import find_completeness_gaps
 from insurance_submission_extractor.llm.factory import create_llm_client
@@ -16,6 +17,7 @@ __all__ = [
     "GroqClient",
     "LLMClient",
     "LLMClientError",
+    "TokenUsage",
     "create_llm_client",
     "find_completeness_gaps",
 ]

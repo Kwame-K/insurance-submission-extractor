@@ -30,6 +30,7 @@ def get_extractor(request: Request) -> SubmissionExtractor:
         extractor = SubmissionExtractor(
             create_llm_client(settings),
             extraction_log_path=settings.extraction_log_path,
+            price_book=settings.price_book(),
         )
         request.app.state.extractor = extractor
 

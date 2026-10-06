@@ -36,6 +36,7 @@ def get_extractor() -> SubmissionExtractor:
         _extractor = SubmissionExtractor(
             create_llm_client(settings),
             extraction_log_path=settings.extraction_log_path,
+            price_book=settings.price_book(),
         )
     return _extractor
 

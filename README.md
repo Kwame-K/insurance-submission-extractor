@@ -335,7 +335,21 @@ Summarize a log file with:
 uv run python scripts/summarize_logs.py logs/extractions.jsonl
 ```
 
-The summary reports error, fallback, review, and unsupported-value rates, p50/p95/max latency, and per-provider latency for successful runs. Cost and token usage are not recorded yet, and `logs/` should not be committed.
+The summary reports error, fallback, review, and unsupported-value rates, p50/p95/max latency, per-provider latency for successful runs, and token and cost totals. `logs/` should not be committed.
+
+### LLM calls
+
+Each record has `llm_calls` and `failed_llm_calls`: the provider calls this application made for the request, including failed ones. A normal request makes 1 call; a fallback makes 2. A request that fails after both providers were tried reports 2 calls, 2 failed. `summarize_logs.py` reports the total, failed total, mean, and maximum per extraction.
+
+These counts exclude retries performed inside the provider SDKs (the Groq SDK retries failed requests up to 2 times by default). Those retries are invisible here but can count against provider rate limits.
+
+### Tokens and cost
+
+Each record also carries `input_tokens`, `output_tokens`, `cost_usd`, and an `attempts` list with one entry per provider call that returned usage, so a fallback shows both calls. Output tokens include reasoning tokens (Gemini `thoughts_token_count`), because providers bill them as output.
+
+Prices are configuration, not code. Set both `<PROVIDER>_INPUT_PRICE_PER_MILLION_USD` and `<PROVIDER>_OUTPUT_PRICE_PER_MILLION_USD` from the provider's price page; without both, `cost_usd` stays `null` for that run and the summary counts it as unpriced. Costs are estimates in USD and ignore tiered pricing, caching discounts, and free tiers.
+
+Known gaps: a call that fails after the provider answered (for example invalid JSON) reports no usage, so its cost is not counted; and clients that do not report usage produce `null` tokens.
 
 ## MCP Server
 

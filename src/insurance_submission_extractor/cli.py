@@ -70,6 +70,7 @@ def main() -> None:
         extractor = SubmissionExtractor(
             llm_client,
             extraction_log_path=settings.extraction_log_path,
+            price_book=settings.price_book(),
         )
 
         result = extractor.extract(

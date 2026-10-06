@@ -22,6 +22,13 @@ LOGGER = logging.getLogger("insurance_submission_extractor.extraction")
 CORRELATION_ID: ContextVar[str | None] = ContextVar("correlation_id", default=None)
 
 
+class AttemptUsage(BaseModel):
+    provider: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+
+
 class ExtractionLogRecord(BaseModel):
     event: Literal["extraction"] = "extraction"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -36,6 +43,12 @@ class ExtractionLogRecord(BaseModel):
     missing_field_count: int | None = None
     unsupported_fields: list[str] = Field(default_factory=list)
     error_type: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cost_usd: float | None = None
+    llm_calls: int | None = None
+    failed_llm_calls: int | None = None
+    attempts: list[AttemptUsage] = Field(default_factory=list)
 
 
 def emit_extraction_log(record: ExtractionLogRecord, path: Path | None) -> None:
@@ -97,6 +110,10 @@ def summarize_records(records: list[dict[str, Any]]) -> dict[str, Any]:
         for field_name in record.get("unsupported_fields", []):
             unsupported_counts[field_name] += 1
 
+    with_calls = [r for r in records if r.get("llm_calls") is not None]
+    with_usage = [r for r in ok if r.get("input_tokens") is not None]
+    priced = [r for r in with_usage if r.get("cost_usd") is not None]
+
     return {
         "total_extractions": total,
         "error_rate": _rate(total - len(ok), total),
@@ -121,4 +138,33 @@ def summarize_records(records: list[dict[str, Any]]) -> dict[str, Any]:
             for provider, values in sorted(by_provider.items())
         },
         "unsupported_by_field": dict(sorted(unsupported_counts.items())),
+        "llm_calls": {
+            "total": sum(r["llm_calls"] for r in with_calls),
+            "failed": sum(r.get("failed_llm_calls") or 0 for r in with_calls),
+            "mean_per_extraction": round(
+                sum(r["llm_calls"] for r in with_calls) / len(with_calls), 3
+            )
+            if with_calls
+            else None,
+            "max_per_extraction": max((r["llm_calls"] for r in with_calls), default=None),
+        },
+        "tokens": {
+            "extractions_with_usage": len(with_usage),
+            "input_total": sum(r["input_tokens"] for r in with_usage),
+            "output_total": sum(r["output_tokens"] for r in with_usage),
+            "input_mean": round(sum(r["input_tokens"] for r in with_usage) / len(with_usage), 1)
+            if with_usage
+            else None,
+            "output_mean": round(sum(r["output_tokens"] for r in with_usage) / len(with_usage), 1)
+            if with_usage
+            else None,
+        },
+        "cost_usd": {
+            "priced_extractions": len(priced),
+            "unpriced_extractions": len(with_usage) - len(priced),
+            "total": round(sum(r["cost_usd"] for r in priced), 6),
+            "mean_per_extraction": round(sum(r["cost_usd"] for r in priced) / len(priced), 6)
+            if priced
+            else None,
+        },
     }
