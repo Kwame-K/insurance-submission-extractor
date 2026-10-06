@@ -260,6 +260,25 @@ Caveats: the new cases were written to expose these defects, so 100% on them is 
 guard rather than an estimate of real-world accuracy. The two Gemini runs differ by one transient
 error, which shows run-to-run variance.
 
+### Fallback under a simulated Gemini outage
+
+To exercise the fallback for real, Gemini was run with an invalid API key and the Groq fallback
+enabled on 14 cases (`gen_complete` and `gen_french`).
+
+| Measure | Result |
+|---|---|
+| Cases served by Groq | 14/14 (`openai/gpt-oss-120b`) |
+| Field accuracy | 100% on every field (14/14) |
+| Cases passed by the harness | 0/14 |
+| Only failing check | `review_required`: expected false, got true |
+
+The harness failures are by design, not extraction errors. When the fallback answers, the
+extractor sets `review_required` and records a note naming the failed primary provider, so a
+person checks results produced by the secondary model. The golden expectations assume the
+primary provider and therefore expect no review. The result confirms that the fallback works end
+to end and is visible to the caller; a separate expectation for fallback runs is a possible
+improvement to the harness. Two identical runs gave the same result.
+
 ## Limitations
 
 - The original benchmark contains only four synthetic cases; dataset v2 adds 63 template-generated cases, which are still synthetic and more regular than real broker emails.
