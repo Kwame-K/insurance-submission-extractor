@@ -42,7 +42,50 @@ def test_dataset_covers_scenario_families() -> None:
         "zero_revenue",
         "zero_employees",
         "noisy_distractors",
+        "number_formats",
+        "partial_address",
+        "accented_city",
+        "ambiguous_activity",
+        "multi_site",
     } <= families
+
+
+def test_edge_case_family_counts_and_labels() -> None:
+    cases = load_golden_cases(DATASET)
+    edge_families = (
+        "number_formats",
+        "partial_address",
+        "accented_city",
+        "ambiguous_activity",
+        "multi_site",
+    )
+    by_family = {
+        family: [case for case in cases if family in case.case_id] for family in edge_families
+    }
+
+    assert {family: len(cases) for family, cases in by_family.items()} == {
+        "number_formats": 7,
+        "partial_address": 6,
+        "accented_city": 3,
+        "ambiguous_activity": 4,
+        "multi_site": 4,
+    }
+    assert all(
+        case.expected_fields.get("source_language") == "fr"
+        for case in by_family["number_formats"][:4]
+    )
+    assert all(
+        "location_city" not in case.expected_fields for case in by_family["partial_address"][:4]
+    )
+
+
+def test_multi_site_cases_preserve_first_site_as_the_oracle() -> None:
+    for case in load_golden_cases(DATASET):
+        if "multi_site" not in case.case_id:
+            continue
+        text = (ROOT / case.input_file).read_text(encoding="utf-8")
+        assert "second location" in text.lower() or "deuxième site" in text.lower()
+        assert case.expected_fields["location_city"] in text
 
 
 def test_inconsistent_cases_raise_expected_flag() -> None:

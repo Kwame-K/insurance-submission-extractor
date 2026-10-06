@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -65,6 +66,23 @@ ACTIVITIES = {
     ),
     "law": ("law firm", "cabinet d'avocats", ["law firm", "legal services"], False),
     "dental": ("dental clinic", "clinique dentaire", ["dental clinic", "dental practice"], False),
+    # Mixed activities: not in the random pools, used only by the ambiguous_activity family.
+    "convenience_restaurant": (
+        "restaurant and convenience store",
+        "restaurant et dépanneur",
+        [
+            "restaurant and convenience store",
+            "convenience store and restaurant",
+            "convenience store/restaurant",
+        ],
+        True,
+    ),
+    "bakery_cafe": (
+        "bakery and cafe",
+        "boulangerie-café",
+        ["bakery and cafe", "bakery and café", "bakery-cafe", "cafe and bakery", "café and bakery"],
+        True,
+    ),
 }
 PROPERTY_ACTIVITIES = ["restaurant", "retail", "warehouse"]
 OTHER_ACTIVITIES = ["accounting", "software", "law", "dental"]
@@ -77,7 +95,20 @@ NAMES = {
     "software": ["Pixel Harbour Software", "Cedar Ridge Technologies", "Nordik Code Inc."],
     "law": ["Granite Peak Law LLP", "Fortin & Associés", "Bayview Legal Group"],
     "dental": ["Aurora Dental Group", "Clinique Dentaire Lavoie", "Maple Smiles Dental"],
+    "convenience_restaurant": ["Dépanneur et Resto Chez Léo", "Corner Stop Grill & Market"],
+    "bakery_cafe": ["Boulangerie Dupuis", "Golden Crust Bakery Cafe"],
 }
+
+# Used only by the edge-case families, so earlier random draws are unchanged.
+ACCENTED_CITIES = [
+    ("Montréal", "QC", "H", "Quebec"),
+    ("Trois-Rivières", "QC", "G", "Quebec"),
+    ("Saint-Jérôme", "QC", "J", "Quebec"),
+]
+STREETS = (
+    ["1250 Sainte-Catherine Street West", "87 King Street East", "4410 Industrial Boulevard"],
+    ["1250, rue Sainte-Catherine Ouest", "87, boulevard Saint-Laurent", "4410, avenue du Parc"],
+)
 
 PRODUCTS = {
     "commercial_property": ("commercial property insurance", "assurance des biens commerciaux"),
@@ -176,14 +207,39 @@ COVERAGE_PHRASINGS: list[tuple[str, tuple[str, ...], str]] = [
 ]
 
 
-def money(rng: random.Random, amount: float, lang: str) -> str:
+def money(rng: random.Random, amount: float, lang: str, fmt: str | None = None) -> str:
     value = int(amount)
+    if fmt is not None:
+        millions = f"{value / 1_000_000:.1f}"
+        return {
+            "fr_m": millions.replace(".", ",") + " M$",
+            "fr_millions": millions.replace(".", ",") + " millions de dollars",
+            "fr_decimal": f"{value:,}".replace(",", " ") + ",00 $",
+            "fr_k": f"{value // 1000} k$",
+            "en_k": f"${value // 1000}K",
+            "en_million": f"CAD {millions} million",
+        }[fmt]
     if lang == "fr":
         return f"{value:,}".replace(",", " ") + " $"
     forms = [f"CAD {value:,}", f"${value:,}"]
     if value >= 1_000_000 and value % 100_000 == 0:
         forms.append(f"${value / 1_000_000:.1f}M")
     return rng.choice(forms)
+
+
+def fold_accents(text: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+
+def format_postal(postal: str, style: str) -> str:
+    compact = postal.replace(" ", "")
+    return {
+        "standard": postal,
+        "lower_compact": compact.lower(),
+        "dashed": f"{compact[:3]}-{compact[3:]}",
+        "no_space": compact,
+    }[style]
 
 
 def postal_code(rng: random.Random, first_letter: str) -> str:
@@ -246,6 +302,8 @@ def email_sentences(
         sentences.append(
             f"Garanties souhaitées : {joined}." if fr else f"Coverages needed: {joined}."
         )
+    if parts.get("second_site"):
+        sentences.append(parts["second_site"])
     for claim in parts["claims"]:
         sentences.append(
             f"En {claim['year']}, nous avons eu un sinistre ({claim['kind']}) d'environ "
@@ -291,6 +349,9 @@ def render_text(
             (labels["coverages"], "; ".join(parts["coverages"]) or na),
             (labels["claims"], claims_value),
         ]
+        if parts.get("second_site"):
+            second_label = "Deuxième site" if fr else "Second location"
+            rows.insert(4, (second_label, parts["second_site_form"]))
         return labels["title"] + "\n\n" + "\n".join(f"{k}: {v}" for k, v in rows) + "\n"
 
     body = email_sentences(lang, parts)
@@ -308,12 +369,14 @@ def render_text(
             ]
         )
 
+    place = parts.get("location_in") or (
+        f"à {parts['location']}" if fr else f"in {parts['location']}"
+    )
     intro = (
         f"Nous souhaitons une soumission pour {parts['product']} pour notre "
-        f"{parts['activity']} à {parts['location']}."
+        f"{parts['activity']} {place}."
         if fr
-        else f"We would like a quote for {parts['product']} for our "
-        f"{parts['activity']} in {parts['location']}."
+        else f"We would like a quote for {parts['product']} for our {parts['activity']} {place}."
     )
     greeting, closing = ("Bonjour,", "Cordialement,") if fr else ("Hello,", "Best regards,")
     subject = "Demande de soumission" if fr else "Quote request"
@@ -346,6 +409,11 @@ def build_case(
     year: int | None = None,
     coverage_phrase: str | None = None,
     coverage_override: tuple[str, ...] | None = None,
+    money_format: str | None = None,
+    postal_format: str = "standard",
+    location_mode: str = "full",
+    accented_city: bool = False,
+    second_site: bool = False,
 ) -> tuple[dict[str, Any], str]:
     case_id = f"gen_{family}_{number:02d}"
     is_property = product in {"commercial_property", "business_package"}
@@ -354,7 +422,17 @@ def build_case(
     accepted_values = [*accepted, activity_fr] if lang == "fr" else accepted
 
     city, province, postal_first, province_name = rng.choice(CITIES)
+    if accented_city:
+        city, province, postal_first, province_name = rng.choice(ACCENTED_CITIES)
     postal = postal_code(rng, postal_first)
+    postal_text = format_postal(postal, postal_format)
+    has_province = "province" in include
+    has_postal = "postal" in include
+    city_value: str | None = city
+    if location_mode == "postal_only":
+        has_province, has_postal, city_value = False, True, None
+    elif location_mode == "province_only":
+        has_province, has_postal, city_value = True, False, None
     revenue_value = (
         revenue if revenue is not None else rng.choice([450_000, 780_000, 1_200_000, 2_500_000])
     )
@@ -369,23 +447,53 @@ def build_case(
 
     lang_index = 1 if lang == "fr" else 0
     location = city
-    if "province" in include:
-        province_text = province_name if rng.random() < 0.5 else province
-        if lang == "fr" and province == "QC":
-            province_text = "Québec"
-        location += f", {province_text}"
-    if "postal" in include:
-        location += f" {postal}"
+    location_in: str | None = None
+    if location_mode == "street":
+        location = f"{rng.choice(STREETS[lang_index])}, {city}"
+    if location_mode in {"full", "street"}:
+        if has_province:
+            province_text = province_name if rng.random() < 0.5 else province
+            if lang == "fr" and province == "QC":
+                province_text = "Québec"
+            location += f", {province_text}"
+        if has_postal:
+            location += f" {postal_text}"
+    elif location_mode == "postal_only":
+        location = postal_text
+        location_in = ("au code postal " if lang == "fr" else "at postal code ") + postal_text
+    elif location_mode == "province_only":
+        province_label = "Québec" if lang == "fr" and province == "QC" else province_name
+        location = province_label
+        location_in = (
+            f"dans la province de {province_label}"
+            if lang == "fr"
+            else f"in the province of {province_label}"
+        )
+    second_site_text = second_site_form = None
+    if second_site:
+        city2, prov2, first2, _ = rng.choice([c for c in CITIES if c[0] != city])
+        postal2 = postal_code(rng, first2)
+        second_site_form = f"{city2}, {prov2} {postal2}"
+        second_site_text = (
+            f"Nous exploitons également un deuxième site à {city2}, {prov2} {postal2}."
+            if lang == "fr"
+            else f"We also operate a second location in {city2}, {prov2} {postal2}."
+        )
 
     parts: dict[str, Any] = {
         "product": PRODUCTS[product][lang_index],
         "activity": activity_fr if lang == "fr" else activity_en,
         "location": location,
+        "location_in": location_in,
+        "second_site": second_site_text,
+        "second_site_form": second_site_form,
         "name": name if "name" in include else None,
         "year": year_value if "year" in include else None,
         "employees": employees_value if "employees" in include else None,
         "employees_n": employees_value,
-        "revenue": money(rng, revenue_value, lang) if "revenue" in include else None,
+        "revenue": (
+            money(rng, revenue_value, lang, money_format) if "revenue" in include else None
+        ),
         "revenue_n": revenue_value,
         "coverages": (
             [COVERAGE_TEXT[c][lang_index] for c in coverages] if "coverages" in include else []
@@ -407,9 +515,9 @@ def build_case(
         submission_id=case_id,
         product_line=ProductLine(product),
         business_activity=accepted[0],
-        location_city=city,
-        location_province=province if "province" in include else None,
-        postal_code=postal if "postal" in include else None,
+        location_city=city_value,
+        location_province=province if has_province else None,
+        postal_code=postal if has_postal else None,
         building_construction_year=year_value if "year" in include else None,
         employee_count=employees_value if "employees" in include else None,
         annual_revenue_cad=float(revenue_value) if "revenue" in include else None,
@@ -431,7 +539,7 @@ def build_case(
 
     expected_fields: dict[str, Any] = {
         "product_line": product,
-        "location_city": city,
+        **({"location_city": city} if city_value is not None and not accented_city else {}),
         "requested_coverages": [c for c in coverages] if "coverages" in include else [],
         "claims_history_status": oracle.claims_history_status.value,
     }
@@ -451,7 +559,10 @@ def build_case(
         "case_id": case_id,
         "input_file": f"{INPUT_PREFIX}/{case_id}.txt",
         "expected_fields": expected_fields,
-        "acceptable_field_values": {"business_activity": accepted_values},
+        "acceptable_field_values": {
+            "business_activity": accepted_values,
+            **({"location_city": [city, fold_accents(city)]} if accented_city else {}),
+        },
         "expected_missing_fields": report.missing_fields,
         "expected_flag_codes": [flag.code for flag in report.data_quality_flags],
         "expected_review_required": report.review_required,
@@ -567,6 +678,76 @@ def specifications() -> list[tuple[str, dict[str, Any]]]:
                     "activity": "restaurant",
                     "claims_none": True,
                 },
+            )
+        )
+    specs.extend(edge_case_specifications())
+    return specs
+
+
+def edge_case_specifications() -> list[tuple[str, dict[str, Any]]]:
+    """Edge-case families, appended after the original matrix so earlier cases are unchanged."""
+    specs: list[tuple[str, dict[str, Any]]] = []
+    formats = [
+        ("fr", 1_200_000, "fr_m", "lower_compact", "restaurant", "email"),
+        ("fr", 2_500_000, "fr_millions", "dashed", "retail", "email"),
+        ("fr", 780_000, "fr_decimal", "no_space", "warehouse", "noisy"),
+        ("fr", 450_000, "fr_k", "standard", "restaurant", "form"),
+        ("en", 450_000, "en_k", "lower_compact", "retail", "email"),
+        ("en", 1_200_000, "en_million", "dashed", "restaurant", "form"),
+        ("en", 2_500_000, "en_million", "no_space", "warehouse", "noisy"),
+    ]
+    for lang, revenue, money_format, postal_format, activity, style in formats:
+        specs.append(
+            (
+                "number_formats",
+                {
+                    "lang": lang,
+                    "revenue": revenue,
+                    "money_format": money_format,
+                    "postal_format": postal_format,
+                    "activity": activity,
+                    "style": style,
+                    "claims_none": True,
+                },
+            )
+        )
+    for mode in ("postal_only", "province_only", "street"):
+        for lang in ("en", "fr"):
+            specs.append(
+                (
+                    "partial_address",
+                    {
+                        "lang": lang,
+                        "location_mode": mode,
+                        "activity": "restaurant",
+                        "claims_none": True,
+                    },
+                )
+            )
+    for lang, style in [("fr", "email"), ("fr", "form"), ("en", "email")]:
+        specs.append(
+            (
+                "accented_city",
+                {"lang": lang, "style": style, "accented_city": True, "claims_none": True},
+            )
+        )
+    for activity, lang, style in [
+        ("convenience_restaurant", "en", "email"),
+        ("convenience_restaurant", "fr", "email"),
+        ("bakery_cafe", "en", "noisy"),
+        ("bakery_cafe", "fr", "form"),
+    ]:
+        specs.append(
+            (
+                "ambiguous_activity",
+                {"activity": activity, "lang": lang, "style": style, "claims_none": True},
+            )
+        )
+    for lang, style in [("en", "email"), ("fr", "email"), ("en", "noisy"), ("en", "form")]:
+        specs.append(
+            (
+                "multi_site",
+                {"lang": lang, "style": style, "second_site": True, "claims_none": True},
             )
         )
     return specs
