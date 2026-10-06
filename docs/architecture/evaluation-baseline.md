@@ -225,6 +225,41 @@ extended to target a known failure. Before the fix Gemini passed 99.0% over thre
 single 100% run is encouraging but not proof of stability. The fallback's behavior under a real
 provider outage is covered by unit tests only.
 
+## Edge-Case Expansion and Normalizer Fixes (2026-10-06)
+
+Dataset v2 grew from 73 to 97 cases with 24 deterministic edge cases in five families:
+`number_formats` (7), `partial_address` (6), `accented_city` (3), `ambiguous_activity` (4) and
+`multi_site` (4). The first 73 cases are unchanged. A multi-site case uses the first named
+location as the oracle because the schema holds a single location.
+
+The first Gemini run on the 24 new cases passed 16/24 (66.7%) with 0 hallucinations. It exposed
+two defects in deterministic code, not in the prompt:
+
+| Defect | Symptom | Fix |
+|---|---|---|
+| Postal codes kept the source format (`t4m1v0`, `M0A-7E1`, `B8C9G9`) | 6 cases failed `postal_code` (16/22) | `normalize_postal_code` canonicalizes to `A1A 1A1`; other values are left unchanged |
+| French activity keys in the occupancy mapping were stored in decomposed Unicode (base letter plus combining accent) | `magasin de détail` and `entrepôt` never matched, `occupancy_type` stayed empty and `review_required` was wrongly true (4 cases) | Lookup now ignores case, accents and Unicode composition; `commerce de détail` was added |
+
+The second defect affected any real French submission for a retail store or a warehouse, not only
+the benchmark. After the fixes the 24 new cases passed 24/24.
+
+| Run (97 cases) | Passed | Errors | Hallucination rate | Missing-field recall |
+|---|---:|---:|---:|---:|
+| Gemini alone, run 1 | 97/97 (100.0%) | 0 | 0.0% | 1.0 |
+| Gemini alone, run 2 | 96/97 (99.0%) | 1 | 0.0% | 1.0 |
+| Gemini + Groq fallback | 97/97 (100.0%) | 0 | 0.0% | 1.0 |
+
+In run 2 the only failure was `gen_no_revenue_01`, a transient Gemini request error
+(`provider_error`), not an extraction mistake. That run was intended to include the Groq
+fallback, but the evaluation runner passes the fallback provider explicitly and ignores the
+`LLM_FALLBACK_PROVIDER` environment variable, so it measured Gemini alone. The combined system
+was then run with `--fallback-provider groq`: it passed 97/97 and the fallback served
+0 of 97 cases, so it behaved like Gemini alone on this benchmark.
+
+Caveats: the new cases were written to expose these defects, so 100% on them is a regression
+guard rather than an estimate of real-world accuracy. The two Gemini runs differ by one transient
+error, which shows run-to-run variance.
+
 ## Limitations
 
 - The original benchmark contains only four synthetic cases; dataset v2 adds 63 template-generated cases, which are still synthetic and more regular than real broker emails.
