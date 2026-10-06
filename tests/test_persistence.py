@@ -181,7 +181,8 @@ def test_postgresql_urls_use_the_psycopg_driver() -> None:
     assert normalize_database_url("sqlite:///x.db") == "sqlite:///x.db"
 
 
-def test_store_is_off_without_a_database_url() -> None:
+def test_store_is_off_without_a_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     assert create_store(Settings(_env_file=None, database_url="")) is None
     assert create_store(Settings(_env_file=None)) is None
     assert isinstance(
