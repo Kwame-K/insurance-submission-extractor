@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     llm_provider: LLMProvider = LLMProvider.GEMINI
     llm_fallback_provider: LLMProvider | None = None
     extraction_log_path: Path | None = None
+    database_url: str | None = None
+    database_auto_migrate: bool = True
 
     gemini_input_price_per_million_usd: float | None = Field(default=None, ge=0)
     gemini_output_price_per_million_usd: float | None = Field(default=None, ge=0)
@@ -51,6 +53,7 @@ class Settings(BaseSettings):
     @field_validator(
         "llm_fallback_provider",
         "extraction_log_path",
+        "database_url",
         "gemini_input_price_per_million_usd",
         "gemini_output_price_per_million_usd",
         "groq_input_price_per_million_usd",

@@ -13,7 +13,7 @@ from collections import defaultdict
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -51,13 +51,30 @@ class ExtractionLogRecord(BaseModel):
     attempts: list[AttemptUsage] = Field(default_factory=list)
 
 
-def emit_extraction_log(record: ExtractionLogRecord, path: Path | None) -> None:
-    """Log a record and, when a path is configured, append it as one JSON line.
+class ExtractionStore(Protocol):
+    def save_extraction(self, record: ExtractionLogRecord) -> None: ...
 
-    Logging problems never interrupt an extraction.
+
+def emit_extraction_log(
+    record: ExtractionLogRecord,
+    path: Path | None,
+    store: ExtractionStore | None = None,
+) -> None:
+    """Log a record, append it to the JSONL file and store it in the database if configured.
+
+    Logging and storage problems never interrupt an extraction.
     """
     line = record.model_dump_json()
     LOGGER.info(line)
+
+    if store is not None:
+        try:
+            store.save_extraction(record)
+        except Exception as error:
+            LOGGER.warning(
+                "Could not store the extraction record in the database (%s)",
+                type(error).__name__,
+            )
 
     if path is None:
         return

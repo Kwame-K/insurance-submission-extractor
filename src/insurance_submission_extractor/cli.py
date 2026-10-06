@@ -7,6 +7,7 @@ from pathlib import Path
 
 from insurance_submission_extractor.config import Settings
 from insurance_submission_extractor.llm import LLMClientError, create_llm_client
+from insurance_submission_extractor.persistence import create_store
 from insurance_submission_extractor.services import SubmissionExtractor
 
 
@@ -71,6 +72,7 @@ def main() -> None:
             llm_client,
             extraction_log_path=settings.extraction_log_path,
             price_book=settings.price_book(),
+            extraction_store=create_store(settings),
         )
 
         result = extractor.extract(

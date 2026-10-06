@@ -11,6 +11,7 @@ from mcp.types import ToolAnnotations
 
 from insurance_submission_extractor.config import Settings
 from insurance_submission_extractor.llm import LLMClientError, create_llm_client
+from insurance_submission_extractor.persistence import create_store
 from insurance_submission_extractor.services import SubmissionExtractor
 from insurance_submission_extractor.services.http_adapter import to_http_result
 
@@ -37,6 +38,7 @@ def get_extractor() -> SubmissionExtractor:
             create_llm_client(settings),
             extraction_log_path=settings.extraction_log_path,
             price_book=settings.price_book(),
+            extraction_store=create_store(settings),
         )
     return _extractor
 

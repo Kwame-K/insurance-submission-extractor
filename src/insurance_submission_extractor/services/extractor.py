@@ -18,6 +18,7 @@ from insurance_submission_extractor.services.telemetry import (
     CORRELATION_ID,
     AttemptUsage,
     ExtractionLogRecord,
+    ExtractionStore,
     emit_extraction_log,
 )
 from insurance_submission_extractor.services.validators import validate_submission
@@ -29,8 +30,10 @@ class SubmissionExtractor:
         llm_client: LLMClient,
         extraction_log_path: Path | None = None,
         price_book: PriceBook | None = None,
+        extraction_store: ExtractionStore | None = None,
     ) -> None:
         self._llm_client = llm_client
+        self._extraction_store = extraction_store
         self._extraction_log_path = extraction_log_path
         self._price_book = price_book or PriceBook()
 
@@ -57,6 +60,7 @@ class SubmissionExtractor:
                     failed_llm_calls=getattr(error, "failed_calls", 1),
                 ),
                 self._extraction_log_path,
+                self._extraction_store,
             )
             raise
 
@@ -92,6 +96,7 @@ class SubmissionExtractor:
                 failed_llm_calls=run_info.failed_calls,
             ),
             self._extraction_log_path,
+            self._extraction_store,
         )
 
         return result

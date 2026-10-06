@@ -2,6 +2,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -49,7 +50,7 @@ def test_runner_survives_provider_errors_and_reports_metrics(
 ) -> None:
     runner = load_runner()
     monkeypatch.chdir(ROOT)
-    monkeypatch.setattr(runner, "Settings", lambda **kwargs: object())
+    monkeypatch.setattr(runner, "Settings", lambda **kwargs: SimpleNamespace(database_url=None))
     monkeypatch.setattr(runner, "create_llm_client", lambda settings: FlakyClient())
     monkeypatch.setattr(
         sys,
@@ -80,7 +81,7 @@ def test_case_selection_filters_by_id_and_prefix(
 ) -> None:
     runner = load_runner()
     monkeypatch.chdir(ROOT)
-    monkeypatch.setattr(runner, "Settings", lambda **kwargs: object())
+    monkeypatch.setattr(runner, "Settings", lambda **kwargs: SimpleNamespace(database_url=None))
     monkeypatch.setattr(runner, "create_llm_client", lambda settings: FlakyClient())
     monkeypatch.setattr(
         sys,

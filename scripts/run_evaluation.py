@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,6 +17,7 @@ from insurance_submission_extractor.evaluation import (
     load_golden_cases,
 )
 from insurance_submission_extractor.llm import LLMClientError, create_llm_client
+from insurance_submission_extractor.persistence import DatabaseStore
 from insurance_submission_extractor.services import SubmissionExtractor
 
 DEFAULT_DATASET_PATH = Path("data/golden/insurance_submission_cases.jsonl")
@@ -59,6 +61,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[provider.value for provider in LLMProvider],
         default=None,
         help="Evaluate the combined primary + fallback system instead of one provider.",
+    )
+    parser.add_argument(
+        "--database-url",
+        default=None,
+        help="Also store this evaluation run in a database (defaults to DATABASE_URL).",
     )
     parser.add_argument(
         "--case-id",
@@ -229,6 +236,17 @@ def main() -> None:
         ),
         encoding="utf-8",
     )
+
+    database_url = arguments.database_url or settings.database_url
+    if database_url:
+        try:
+            run_id = DatabaseStore(database_url).save_evaluation(report)
+            print(f"Stored evaluation run {run_id} in the database.")
+        except Exception as error:
+            print(
+                f"Warning: could not store the evaluation ({type(error).__name__}).",
+                file=sys.stderr,
+            )
 
     print()
     print(
