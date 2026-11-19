@@ -103,9 +103,7 @@ For the current MVP and the current synthetic benchmark:
 
 ## Expanded Dataset v2
 
-A deterministic generator (`scripts/generate_golden_dataset.py`, fixed seed) produces 63 additional
-synthetic submissions, stored in `data/synthetic/generated/` and combined with the four original
-cases in `data/golden/insurance_submission_cases_v2.jsonl` (67 cases).
+A deterministic generator (`scripts/generate_golden_dataset.py`, fixed seed) produces 63 additional synthetic submissions, stored in `data/synthetic/generated/` and combined with the four original cases in `data/golden/insurance_submission_cases_v2.jsonl` (67 cases).
 
 Labels are derived by running the deterministic normalizer and validators on a known oracle
 submission, so expected missing fields, quality flags, and `review_required` always match the
@@ -279,9 +277,24 @@ primary provider and therefore expect no review. The result confirms that the fa
 to end and is visible to the caller; a separate expectation for fallback runs is a possible
 improvement to the harness. Two identical runs gave the same result.
 
+## Results Summary
+
+| Dataset | Cases | System | Runs | Passed | Pass rate |
+|---|---:|---|---:|---:|---:|
+| v1 | 4 | Gemini | 3 | 11/12 | 91.7% |
+| v1 | 4 | Groq | 3 | 12/12 | 100.0% |
+| v2 (initial) | 67 | Gemini | 3 | 199/201 | 99.0% |
+| v2 (initial) | 67 | Groq | 3 | 179/201 | 89.1% |
+| v2 + coverage fix | 73 | Gemini alone | 1 | 73/73 | 100.0% |
+| v2 + coverage fix | 73 | Gemini + Groq fallback | 1 | 73/73 | 100.0% |
+| v2 + edge cases | 97 | Gemini alone | 2 | 97/97 and 96/97 | 100.0% and 99.0% |
+| v2 + edge cases | 97 | Gemini + Groq fallback | 1 | 97/97 | 100.0% |
+
+Dataset sizes: 4 hand-written cases, 63 generated (67), 6 `coverage_phrasing` (73), 24 edge cases (97).
+
 ## Limitations
 
-- The original benchmark contains only four synthetic cases; dataset v2 adds 63 template-generated cases, which are still synthetic and more regular than real broker emails.
+- The original benchmark contains only four synthetic cases; dataset v2 adds 93 template-generated cases (97 in total), which are still synthetic and more regular than real broker emails.
 - A valid structured response does not guarantee factual correctness.
 - Before production use, extend the golden dataset with anonymized or representative
   broker submissions, additional incomplete cases, ambiguous locations, multiple

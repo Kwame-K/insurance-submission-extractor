@@ -96,20 +96,24 @@ insurance-submission-extractor/
 ├── .github/workflows/ci.yml
 ├── data/
 │   ├── golden/
-│   │   └── insurance_submission_cases.jsonl
+│   │   ├── insurance_submission_cases.jsonl
+│   │   └── insurance_submission_cases_v2.jsonl
 │   ├── evaluations/
 │   └── synthetic/
 │       ├── cyber_submission.txt
 │       ├── incomplete_submission.txt
 │       ├── inconsistent_submission.txt
-│       └── restaurant_submission.txt
+│       ├── restaurant_submission.txt
+│       └── generated/          # 93 generated cases (gen_*.txt)
 ├── docs/
 │   ├── architecture/
 │   │   ├── evaluation-baseline.md
 │   │   └── system-architecture.md
 │   └── extraction_http_contract.md
 ├── scripts/
-│   └── run_evaluation.py
+│   ├── generate_golden_dataset.py
+│   ├── run_evaluation.py
+│   └── summarize_logs.py
 ├── src/
 │   └── insurance_submission_extractor/
 │       ├── api/
@@ -128,6 +132,7 @@ insurance-submission-extractor/
 │       │   ├── integration.py
 │       │   └── submission.py
 │       ├── services/
+│       │   ├── evidence.py
 │       │   ├── extractor.py
 │       │   ├── http_adapter.py
 │       │   ├── normalizers.py
@@ -444,7 +449,27 @@ uv run python scripts/run_evaluation.py --provider gemini \
   --dataset data/golden/insurance_submission_cases_v2.jsonl --delay-seconds 1
 ```
 
-### Current Golden Cases
+### Latest Results (dataset v2, 97 cases)
+
+| Run | Cases | System | Passed | Pass rate |
+|---|---:|---|---:|---:|
+| v1 baseline (3 runs) | 4 | Gemini | 11/12 | 91.7% |
+| v1 baseline (3 runs) | 4 | Groq | 12/12 | 100.0% |
+| v2 baseline, 2026-10-05 (3 runs) | 67 | Gemini | 199/201 | 99.0% |
+| v2 baseline, 2026-10-05 (3 runs) | 67 | Groq | 179/201 | 89.1% |
+| After coverage prompt fix (1 run) | 73 | Gemini alone | 73/73 | 100.0% |
+| Edge-case expansion, run 1 | 97 | Gemini alone | 97/97 | 100.0% |
+| Edge-case expansion, run 2 | 97 | Gemini alone | 96/97 | 99.0% (1 transient provider error) |
+| Edge-case expansion | 97 | Gemini + Groq fallback | 97/97 | 100.0% (fallback used 0 times) |
+
+Hallucination rate is 0.0% and missing-field recall is 1.0 on the recent runs. The dataset is
+synthetic and template-generated, and the edge cases were written to expose known defects, so
+these scores are a regression guard, not an estimate of real-world accuracy. Under a simulated
+Gemini outage, Groq served 14/14 cases with 100% field accuracy; the harness counted them as
+failed only because `review_required` is true by design in fallback mode. Full details are in
+`docs/architecture/evaluation-baseline.md`.
+
+### Original Golden Cases (v1)
 
 | Case | Scenario | Validation Focus |
 |---|---|---|
@@ -453,7 +478,7 @@ uv run python scripts/run_evaluation.py --provider gemini \
 | `warehouse_inconsistent` | Building year later than a prior fire claim | Deterministic temporal inconsistency detection |
 | `cyber_no_losses` | Cyber submission with explicitly reported no-loss history | Product classification and claims-history status |
 
-See `docs/architecture/evaluation-baseline.md` for the latest recorded pass rates by provider. Results are limited to the current four-case synthetic dataset and must not be treated as a general provider benchmark.
+See `docs/architecture/evaluation-baseline.md` for the full history of recorded results.
 
 ## Quality Checks
 
@@ -473,7 +498,8 @@ The GitHub Actions workflow runs formatting checks, linting, and tests on pushes
 
 ## Limitations
 
-- The golden dataset (73 cases) is synthetic and was written alongside the prompt, so scores are an optimistic baseline, not a measure of performance on real broker submissions.
+- The golden dataset (97 cases) is synthetic and was written alongside the prompt, so scores are an optimistic baseline, not a measure of performance on real broker submissions. The 24 edge cases were written to expose known defects.
+- In fallback mode `review_required` is true by design, so the golden expectations (which assume the primary provider) count those runs as failures; a separate fallback expectation is not implemented yet.
 - Token usage, LLM call counts, and estimated cost are recorded per extraction in the log, but the evaluation runner does not report them per case, and it does not measure confidence calibration or retrieval quality.
 - Token and call counts exclude retries performed inside the provider SDKs, and a call that fails after the provider answered reports no usage.
 - End-to-end behavior with the Underwriting Agent (correlation ID propagation, review routing) is verified manually; there is no automated cross-project test. The Underwriting Agent does not yet map a complete extraction to its underwriting model.
@@ -509,8 +535,8 @@ This project is Project 1 of a five-project portfolio orchestrated locally throu
 ## Improvements and Next Steps
 
 1. Instrument `SubmissionExtractor.extract()` with tracing (Langfuse or OpenTelemetry) capturing provider, cost, latency, and retries for every run.
-2. Expand the golden dataset with French-language cases and additional edge cases (ambiguous activity, partial addresses, multi-location submissions).
-3. Persist extraction and evaluation results in PostgreSQL instead of flat JSON files to enable cross-project analytics with Project 2.
+2. Extend the golden dataset with anonymized or representative broker submissions (French-language and edge cases are already covered in v2).
+3. Expose the persisted extraction and evaluation history (SQLite/PostgreSQL, already implemented) to Project 2 for cross-project analytics.
 4. Add end-to-end integration tests that exercise the full `X-Correlation-ID` trace from this service through the Underwriting Agent.
 5. Introduce a per-request cost and retry budget in `config.py`, with explicit rejection when limits are exceeded.
 6. Formalize a versioned prompt-change process (changelog per prompt version) for `prompts/extraction_prompt.py`.
