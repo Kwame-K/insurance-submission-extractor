@@ -2,157 +2,78 @@
 
 [![Continuous Integration](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 
-A provider-agnostic LLM application that converts unstructured commercial insurance submissions into validated, structured data.
+A provider-agnostic LLM application that converts unstructured commercial insurance submission text into validated, structured data.
 
-The project combines structured LLM outputs, Pydantic data contracts, deterministic insurance-domain normalization, business-rule validation, review routing, an HTTP API, and a versioned evaluation dataset. It is the first building block (Project 1) of a larger agentic insurance platform that already includes a Data Analyst Agent (Project 2), a Knowledge Agent / RAG service (Project 3), and an Underwriting Agent (Project 4).
+This repository is Project 1 in the Insurance Agentic Platform. It owns extraction, normalization, source evidence, and data-quality validation. It does not make underwriting decisions, calculate premiums, or bind coverage.
+
+> This is a portfolio and learning project. The examples and evaluation data are synthetic.
 
 ## Problem
 
-Commercial insurance submissions are often received as unstructured broker emails, documents, or free-text forms. Before an underwriter can assess eligibility, pricing, and risk, the submission must be converted into consistent and validated fields.
+Broker submissions often arrive as emails, documents, or free-text forms. The extractor takes the text of a submission and turns it into candidate insurance fields: product line, requested coverages, insured name, business activity, location, building characteristics, employee count, revenue, and claims history. It reports missing or ambiguous information instead of treating the model output as a verified submission.
 
-This project extracts structured information such as:
-
-- Product line and requested coverages
-- Insured name and business activity
-- Location and building characteristics
-- Employee count and annual revenue
-- Claims history and claims-history status
-- Missing information and data-quality issues
-- Human-review requirement
-
-The application does not make underwriting decisions, accept or decline risks, or calculate premiums. It focuses on trustworthy data extraction and validation.
+The input contract is text-based. This service does not read PDF attachments or perform OCR.
 
 ## Key Features
 
-- Provider-agnostic LLM architecture (`llm/base.py`, `llm/factory.py`)
-- Gemini support through `gemini-3.7-flash`
-- Groq support through `openai/gpt-oss-120b`
-- Structured JSON extraction with Pydantic validation
-- Insurance-domain enums for product lines, coverages, claim types, and data-quality severity
-- Deterministic normalization of business activity into occupancy type
-- Deterministic data-quality validation rules
-- Explicit distinction between missing claims history and explicitly reported no-loss history
-- `review_required` routing signal for incomplete submissions
-- Deterministic source evidence: each extracted value is traced to a supporting passage (`source_references`); unsupported values are listed in `ambiguous_fields` and routed to review
-- Optional provider fallback (`LLM_FALLBACK_PROVIDER`) triggered by provider failure or omitted explicit fields
-- FastAPI HTTP service (`api/app.py`) with health check and extraction endpoint
-- MCP server (`mcp_server/server.py`, stdio) exposing the `extract_submission` tool to MCP clients and agents
-- Shared HTTP/MCP response adapter (`services/http_adapter.py`) so both interfaces return the same v1 contract
-- `X-Correlation-ID` propagation for cross-service tracing with Project 4
-- Dockerized service with `compose.yaml`
-- Versioned synthetic golden dataset
-- Multi-provider regression evaluation runner
-- Automated formatting, linting, static typing, and tests through GitHub Actions
+- Gemini and Groq implementations behind a shared LLM client interface.
+- Structured extraction validated with Pydantic.
+- Deterministic normalization, business-rule validation, and source-evidence checks.
+- Separate representations for missing claims history and explicitly reported no-loss history.
+- `source_references` for supported values, `ambiguous_fields` for unsupported values, and a `review_required` routing signal.
+- Optional provider fallback for provider failures and selected explicit fields that the primary response omitted.
+- CLI, FastAPI, and an MCP stdio server; HTTP and MCP share the v1 response contract.
+- Structured extraction logs and optional SQLite or PostgreSQL history.
+- Versioned synthetic evaluation datasets and a multi-provider regression runner.
 
 ## Architecture
 
 ```text
-                         Unstructured Submission
-                                   |
-               +-------------------+-------------------+
-               v                                       v
-              CLI                              FastAPI / MCP server
-               |                                       |
-               +-------------------+-------------------+
-                                   v
-                         SubmissionExtractor
-                                   |
-                                   v
-                      Provider-Agnostic LLM Client
-                         /                     \
-                        v                       v
-            GeminiClient                 GroqClient
-        gemini-3.7-flash          openai/gpt-oss-120b
-                         \                     /
-                          v                   v
-                    Structured JSON Extraction
-                                   |
-                                   v
-                     Pydantic Schema Validation
-              (schemas/submission.py, schemas/integration.py)
-                                   |
-                                   v
-              Deterministic Domain Normalization
-              business_activity -> occupancy_type
-                                   |
-                                   v
-              Deterministic Business Rule Validation
-                                   |
-                                   v
-               ExtractionResult + review_required
-                                   |
-                    +--------------+--------------+
-                    v                             v
-         Golden Dataset Evaluation      HTTP Response (with
-              Runner                    X-Correlation-ID)
+Submission text
+    ↓
+CLI / FastAPI / MCP
+    ↓
+SubmissionExtractor → Gemini or Groq
+    ↓
+Pydantic validation
+    ↓
+Deterministic normalization, business validation, and source evidence checks
+    ↓
+Extraction result + missing fields + review signal
+    ↓
+HTTP/MCP consumer or evaluation runner
 ```
 
-For a detailed architecture description, component responsibilities, sequence diagrams, evaluation flow, and future underwriting workflow, see [System Architecture](docs/architecture/system-architecture.md).
+See [System Architecture](docs/architecture/system-architecture.md) and the [HTTP extraction contract](docs/extraction_http_contract.md).
 
 ## Project Structure
 
 ```text
 insurance-submission-extractor/
-├── .github/workflows/ci.yml
 ├── data/
-│   ├── golden/
-│   │   ├── insurance_submission_cases.jsonl
-│   │   └── insurance_submission_cases_v2.jsonl
-│   ├── evaluations/
-│   └── synthetic/
-│       ├── cyber_submission.txt
-│       ├── incomplete_submission.txt
-│       ├── inconsistent_submission.txt
-│       ├── restaurant_submission.txt
-│       └── generated/          # 93 generated cases (gen_*.txt)
+│   ├── golden/                 # Versioned synthetic JSONL cases
+│   ├── evaluations/            # Evaluation reports
+│   └── synthetic/              # Example and generated submissions
 ├── docs/
 │   ├── architecture/
-│   │   ├── evaluation-baseline.md
-│   │   └── system-architecture.md
 │   └── extraction_http_contract.md
 ├── scripts/
 │   ├── generate_golden_dataset.py
 │   ├── run_evaluation.py
 │   └── summarize_logs.py
-├── src/
-│   └── insurance_submission_extractor/
-│       ├── api/
-│       │   └── app.py
-│       ├── mcp_server/
-│       │   ├── __init__.py
-│       │   └── server.py
-│       ├── llm/
-│       │   ├── base.py
-│       │   ├── factory.py
-│       │   ├── gemini_client.py
-│       │   └── groq_client.py
-│       ├── prompts/
-│       │   └── extraction_prompt.py
-│       ├── schemas/
-│       │   ├── integration.py
-│       │   └── submission.py
-│       ├── services/
-│       │   ├── evidence.py
-│       │   ├── extractor.py
-│       │   ├── http_adapter.py
-│       │   ├── normalizers.py
-│       │   └── validators.py
-│       ├── cli.py
-│       ├── config.py
-│       └── evaluation.py
+├── src/insurance_submission_extractor/
+│   ├── api/
+│   ├── llm/
+│   ├── mcp_server/
+│   ├── prompts/
+│   ├── schemas/
+│   ├── services/
+│   ├── cli.py
+│   ├── config.py
+│   └── evaluation.py
 ├── tests/
-│   ├── test_api.py
-│   ├── test_config.py
-│   ├── test_evaluation.py
-│   ├── test_extractor.py
-│   ├── test_integration_schemas.py
-│   ├── test_llm_factory.py
-│   ├── test_mcp_server.py
-│   ├── test_normalizers.py
-│   ├── test_prompts.py
-│   ├── test_schemas.py
-│   └── test_validators.py
 ├── .env.example
+├── alembic.ini
 ├── compose.yaml
 ├── Dockerfile
 ├── pyproject.toml
@@ -161,61 +82,49 @@ insurance-submission-extractor/
 
 ## Technology Stack
 
-| Area | Technology |
-|---|---|
-| Language | Python 3.11+ |
-| Environment and dependencies | uv |
-| Web framework | FastAPI + uvicorn[standard] |
-| LLM providers | Google Gemini and Groq |
-| LLM models | gemini-3.7-flash and openai/gpt-oss-120b |
-| Structured data | Pydantic and pydantic-settings |
-| Testing | pytest and pytest-cov |
-| Linting and formatting | Ruff |
-| Containerization | Docker and Docker Compose |
-| CI | GitHub Actions |
+Python 3.11+, uv, FastAPI, Pydantic, Gemini, Groq, SQLAlchemy, Alembic, pytest, Ruff, Docker, and GitHub Actions.
 
 ## Setup
 
-### Prerequisites
-
-- Python 3.11 or later
-- [uv](https://docs.astral.sh/uv/)
-- A Gemini API key, a Groq API key, or both
-
-### Installation
-
 ```bash
-git clone https://github.com/Kwame-K/insurance-submission-extractor.git
+git clone [https://github.com/Kwame-K/insurance-submission-extractor.git](https://github.com/Kwame-K/insurance-submission-extractor.git)
 cd insurance-submission-extractor
 uv sync --all-groups
-```
-
-### Environment Configuration
-
-Create a local environment file:
-
-```bash
 cp .env.example .env
 ```
 
-Configure at least one provider in `.env`:
+Configure the provider you intend to use:
 
 ```dotenv
 LLM_PROVIDER=groq
-
 GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=openai/gpt-oss-120b
 GROQ_MAX_RETRIES=3
-
-GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-3.7-flash
 ```
 
-Do not commit `.env` files or API keys.
+For Gemini, set `LLM_PROVIDER=gemini`, `GEMINI_API_KEY`, and `GEMINI_MODEL=gemini-3.7-flash`. Configure both providers only if you want to switch between them or enable fallback. Do not commit `.env` or API keys.
+
+### Database Persistence
+
+Database persistence is optional. Set `DATABASE_URL` to a SQLite or PostgreSQL connection string:
+
+```dotenv
+DATABASE_URL=sqlite:///logs/history.db
+```
+
+Extraction history stores identifiers, provider and model, latency, fallback and review flags, token counts, estimated cost, and the names of unsupported fields. It does not store submission text, extracted values, or evidence excerpts. Evaluation history can store run metrics and per-case outcomes.
+
+Alembic migrations run automatically on the first database write by default. To manage them explicitly, set `DATABASE_AUTO_MIGRATE=false` and run:
+
+```bash
+uv run alembic -c alembic.ini upgrade head
+```
+
+A database write failure is logged and does not fail the extraction. JSONL logging remains available independently.
 
 ## Usage
 
-### Extract a Submission (CLI)
+### CLI
 
 ```bash
 uv run insurance-submission-extractor \
@@ -223,262 +132,98 @@ uv run insurance-submission-extractor \
   --submission-id SUB-2026-0001
 ```
 
-Example output:
+### Validation Strategy
 
-```json
-{
-  "submission": {
-    "submission_id": "SUB-2026-0001",
-    "product_line": "commercial_property",
-    "insured_name": "Le Jardin Bistro",
-    "business_activity": "restaurant",
-    "location_city": "Montreal",
-    "location_province": "QC",
-    "postal_code": "H2X 1Y4",
-    "building_construction_year": 1998,
-    "occupancy_type": "restaurant",
-    "employee_count": 24,
-    "annual_revenue_cad": 1200000.0,
-    "requested_coverages": ["property_damage", "business_interruption"],
-    "claims_history_status": "losses_reported"
-  },
-  "missing_fields": [],
-  "data_quality_flags": [],
-  "review_required": false,
-  "provider": "groq",
-  "model": "openai/gpt-oss-120b"
-}
-```
+1. Pydantic validates types, constraints, and enumerated values.
+2. Deterministic normalization can derive occupancy from business activity without replacing explicit occupancy information.
+3. Business validation checks for missing fields and inconsistencies, such as an unrecognized province, duplicate claims, or a construction year later than a reported claim year.
+4. The source-evidence check looks for supporting text. Unsupported values are reported in `ambiguous_fields`, receive a `VALUE_NOT_FOUND_IN_SOURCE` flag, and set `review_required=true`.
 
-### Switch Providers
+The evidence check does not verify `claims_history_status`, `source_language`, or `occupancy_type`. Finding matching words is not proof that a field was interpreted correctly.
 
-```dotenv
-LLM_PROVIDER=gemini
-```
-or
-```dotenv
-LLM_PROVIDER=groq
-```
+### Provider Fallback
 
-The extraction schema, normalization, validation rules, CLI, API, and evaluation logic remain unchanged across providers.
-
-## Validation Strategy
-
-```text
-LLM extraction
-    +
-Pydantic structural validation
-    +
-Deterministic normalization
-    +
-Deterministic business validation
-    =
-Auditable extraction pipeline
-```
-
-### Pydantic Validation
-
-- Data types and numeric constraints
-- Allowed product lines, coverage types, and claim types
-- Future claim years
-- Contradictory claims-history statuses
-- JSON output compatibility with the integration contract (`schemas/integration.py`)
-
-### Domain Normalization
-
-```text
-business_activity = "Restaurant"
-        |
-        v
-occupancy_type = "restaurant"
-```
-
-Explicit occupancy information is preserved and never overwritten by a derived value.
-
-### Source Evidence Check
-
-`services/evidence.py` searches the source text, without a model, for the passage supporting each extracted value. Supported values are returned in `source_references` with a short excerpt. Unsupported values are listed in `ambiguous_fields`, receive a `VALUE_NOT_FOUND_IN_SOURCE` flag, and set `review_required=true`. The search ignores case and accents, accepts common number formats, requires construction wording near a building year, and does not accept a province inferred from a city.
-
-Offline, the check reported no unsupported field on the 73 golden expected values or on 571 stored provider outputs, and it flagged the one province hallucination among them. It does not verify `claims_history_status`, `source_language`, or `occupancy_type`; matching wording also does not prove that an insured name or product line is correct.
-
-### Business Validation
-
-- Missing required fields
-- Missing claims-history information
-- Unrecognized province or territory codes
-- Zero revenue or zero employee counts requiring confirmation
-- Duplicate claim records
-- Building construction years later than reported claim years
-
-The `review_required` field is a routing signal consumed downstream by the Underwriting Agent (Project 4).
+Set `LLM_FALLBACK_PROVIDER` to enable fallback. It can run after a provider error or when the primary response omits explicit source text for revenue, employee count, construction year, postal code, or a named property or business interruption coverage. It does not infer values. When fallback is used, the extraction is routed to review even if the fallback supplies the missing value.
 
 ## HTTP API
-
-Start the API locally:
 
 ```bash
 uv run uvicorn insurance_submission_extractor.api.app:app --reload
 ```
 
-The service is available at `http://127.0.0.1:8000`.
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | Check API liveness |
+| POST | `/v1/extract-submission` | Extract and validate information from submission text |
+| GET | `/docs` | Browse the OpenAPI contract |
 
-| Endpoint | Purpose |
-|---|---|
-| GET /health | Confirms that the API process is running |
-| POST /v1/extract-submission | Extracts and validates candidate data from a text-based insurance submission |
-| GET /docs | Interactive OpenAPI documentation |
+The API runs on port `8000` by default. Send `X-Correlation-ID` to trace a request across services; the API returns it in the response and generates one when omitted. See the [HTTP extraction contract](docs/extraction_http_contract.md) for request and response details.
 
-The API contract is documented in `docs/extraction_http_contract.md`. The consumer should send an `X-Correlation-ID` header; the service propagates the same value in its response header and generates a UUID when omitted. This allows the Underwriting Agent (Project 4) to trace one request across the Submission Extractor and the Insurance Knowledge Agent (Project 3).
+The Underwriting Agent calls this API from `POST /extract-and-underwrite`. It maps the candidate extraction to its own submission model and handles any missing underwriting fields downstream. The extractor itself does not approve or decline a submission.
 
 ## Observability
 
-Every extraction emits one structured record on the `insurance_submission_extractor.extraction` logger. Set `EXTRACTION_LOG_PATH` to also append it as a JSON line to a file. Each record holds metadata only: `submission_id`, `correlation_id` (from `X-Correlation-ID` on the HTTP API), final `provider` and `model`, `duration_ms`, `fallback_used`, `review_required`, `missing_field_count`, the names of `unsupported_fields`, and `error_type` on failure. It never contains submission text, extracted values, evidence excerpts, or provider error messages. A log write failure never interrupts an extraction.
-
-Summarize a log file with:
+The `insurance_submission_extractor.extraction` logger emits structured metadata for each extraction. Set `EXTRACTION_LOG_PATH` to also append records to a local JSONL file.
 
 ```bash
 uv run python scripts/summarize_logs.py logs/extractions.jsonl
 ```
 
-The summary reports error, fallback, review, and unsupported-value rates, p50/p95/max latency, per-provider latency for successful runs, and token and cost totals. `logs/` should not be committed.
+The summary covers latency, error and fallback rates, review rate, unsupported fields, provider calls, tokens, and estimated cost when pricing is configured. Provider SDK retries are not included in the application call counts. Failed attempts that do not return usage cannot be priced.
 
-### LLM calls
-
-Each record has `llm_calls` and `failed_llm_calls`: the provider calls this application made for the request, including failed ones. A normal request makes 1 call; a fallback makes 2. A request that fails after both providers were tried reports 2 calls, 2 failed. `summarize_logs.py` reports the total, failed total, mean, and maximum per extraction.
-
-These counts exclude retries performed inside the provider SDKs (the Groq SDK retries failed requests up to 2 times by default). Those retries are invisible here but can count against provider rate limits.
-
-### Tokens and cost
-
-Each record also carries `input_tokens`, `output_tokens`, `cost_usd`, and an `attempts` list with one entry per provider call that returned usage, so a fallback shows both calls. Output tokens include reasoning tokens (Gemini `thoughts_token_count`), because providers bill them as output.
-
-Prices are configuration, not code. Set both `<PROVIDER>_INPUT_PRICE_PER_MILLION_USD` and `<PROVIDER>_OUTPUT_PRICE_PER_MILLION_USD` from the provider's price page; without both, `cost_usd` stays `null` for that run and the summary counts it as unpriced. Costs are estimates in USD and ignore tiered pricing, caching discounts, and free tiers.
-
-Known gaps: a call that fails after the provider answered (for example invalid JSON) reports no usage, so its cost is not counted; and clients that do not report usage produce `null` tokens.
+With `DATABASE_URL` configured, run `uv run python scripts/summarize_logs.py` without a log path to summarize database history; add `--evaluations` to list stored evaluation runs.
 
 ## MCP Server
-
-The extractor is also available as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so MCP clients and agents (for example the Underwriting Agent, or a client that also connects to `insurance-rag-assistant`) can call it as a tool. It reuses the same `SubmissionExtractor` and the same v1 response contract as the HTTP API.
-
-Start the server:
 
 ```bash
 uv run insurance-submission-mcp
 ```
 
-Inspect it interactively:
+The stdio server exposes `extract_submission`. It accepts `source_id`, `content`, and optional `language`, `source_type`, and `document_name`. It returns the shared v1 extraction contract and is annotated as read-only and idempotent. Logs go to stderr.
 
 ```bash
 npx @modelcontextprotocol/inspector uv run insurance-submission-mcp
 ```
 
-| Tool | Purpose |
-|---|---|
-| `extract_submission` | Extracts candidate structured data from a text-based commercial insurance submission |
-
-`extract_submission` parameters: `source_id` (required, consumer-generated), `content` (required), `language` (default `en`), `source_type` (default `FREE_TEXT`), `document_name` (optional). It returns the v1 contract: `extraction_status`, `submission_data`, `missing_fields`, `ambiguous_fields`, `source_references`, `data_quality_flags`, `review_required`, `provider`, `model`. The tool is annotated read-only and idempotent. It never accepts, declines, prices, or binds a risk. Provider failures are raised as an error prefixed with `LLM_PROVIDER_ERROR`.
-
-Example client configuration (Claude Desktop, Cursor, or any stdio MCP client):
-
-```json
-{
-  "mcpServers": {
-    "insurance-submission-extractor": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/absolute/path/to/insurance-submission-extractor",
-        "run",
-        "insurance-submission-mcp"
-      ]
-    }
-  }
-}
-```
-
-Provider settings (`LLM_PROVIDER` and API keys) are read from the project `.env` file. Logs are written to stderr because stdout carries the stdio protocol.
-
 ## Docker
 
 ```bash
-docker compose up --build          # build and start
-docker compose up --build -d       # run in background
+docker compose up --build -d
 curl -i -H "X-Correlation-ID: docker-health-001" http://127.0.0.1:8000/health
-docker compose down                # stop
+docker compose down
 ```
 
-This service is also orchestrated centrally by the `insurance-agentic-platform` Docker Compose project alongside the Underwriting Agent.
+The central [Insurance Agentic Platform](https://github.com/Kwame-K/insurance-agentic-platform) runs this repository as `submission-extractor` on port `8000`, with PostgreSQL configured through `DATABASE_URL`.
 
 ## Evaluation
-
-The application includes a versioned JSONL golden dataset containing synthetic insurance submissions and expected outputs.
 
 ```bash
 uv run python scripts/run_evaluation.py --provider gemini
 uv run python scripts/run_evaluation.py --provider groq
 ```
 
-Each evaluation run:
-
-1. Loads the synthetic golden cases.
-2. Sends each case to the selected provider.
-3. Runs deterministic normalization and business validation.
-4. Compares extracted values, expected missing fields, flags, and review routing.
-5. Records a timestamped JSON report in `data/evaluations/`.
-
-### Provider Fallback
-
-Set `LLM_FALLBACK_PROVIDER` (for example `groq` with `LLM_PROVIDER=gemini`) to enable an automatic fallback. It runs when the primary provider raises an error, or when a deterministic check finds explicit source information the primary left empty: revenue, employee count, construction year, postal code, or a named property / business interruption coverage. The check never infers values and ignores product wording alone.
-
-Any fallback involvement, or any unresolved gap, sets `review_required=true` and adds an explanation to `extraction_notes`; `provider` and `model` report the provider that produced the result. Evaluate the combined system with:
+Use the expanded v2 dataset explicitly:
 
 ```bash
-uv run python scripts/run_evaluation.py --provider gemini --fallback-provider groq \
-  --dataset data/golden/insurance_submission_cases_v2.jsonl --delay-seconds 1
-```
-
-The check does not detect omitted insured names, wrong product lines, or invented provinces.
-
-### Expanded Dataset (v2)
-
-`data/golden/insurance_submission_cases_v2.jsonl` holds 97 cases (4 hand-written and 93 generated by `scripts/generate_golden_dataset.py`, including six `coverage_phrasing` regression cases and 24 edge cases). The edge cases cover French/English money and postal-code formats, partial addresses, accented city names, mixed activities, and multi-site submissions. A multi-site case uses the first named location as the single-location schema oracle; it is a regression test for extraction, not a representation of multiple insured locations. Run it with `--dataset`; reports include per-field accuracy, missing-field recall, hallucination rate, and per-family pass rates. See `docs/architecture/evaluation-baseline.md`.
-
-```bash
-uv run python scripts/generate_golden_dataset.py   # regenerate (deterministic)
 uv run python scripts/run_evaluation.py --provider gemini \
-  --dataset data/golden/insurance_submission_cases_v2.jsonl --delay-seconds 1
+  --dataset data/golden/insurance_submission_cases_v2.jsonl \
+  --delay-seconds 1
 ```
 
-### Latest Results (dataset v2, 97 cases)
+The v2 dataset contains 97 synthetic cases: four hand-written cases and 93 generated cases, including coverage-phrasing regressions and 24 edge cases. Evaluation reports are written to `data/evaluations/`.
 
-| Run | Cases | System | Passed | Pass rate |
-|---|---:|---|---:|---:|
-| v1 baseline (3 runs) | 4 | Gemini | 11/12 | 91.7% |
-| v1 baseline (3 runs) | 4 | Groq | 12/12 | 100.0% |
-| v2 baseline, 2026-10-05 (3 runs) | 67 | Gemini | 199/201 | 99.0% |
-| v2 baseline, 2026-10-05 (3 runs) | 67 | Groq | 179/201 | 89.1% |
-| After coverage prompt fix (1 run) | 73 | Gemini alone | 73/73 | 100.0% |
-| Edge-case expansion, run 1 | 97 | Gemini alone | 97/97 | 100.0% |
-| Edge-case expansion, run 2 | 97 | Gemini alone | 96/97 | 99.0% (1 transient provider error) |
-| Edge-case expansion | 97 | Gemini + Groq fallback | 97/97 | 100.0% (fallback used 0 times) |
+| Recorded run | Cases | System | Passed |
+|---|---:|---|---:|
+| Original baseline, three runs | 4 | Gemini | 11/12 |
+| Original baseline, three runs | 4 | Groq | 12/12 |
+| 2026-10-05 baseline, three runs | 67 | Gemini | 199/201 |
+| 2026-10-05 baseline, three runs | 67 | Groq | 179/201 |
+| After coverage prompt fix | 73 | Gemini | 73/73 |
+| Edge-case expansion, run 1 | 97 | Gemini | 97/97 |
+| Edge-case expansion, run 2 | 97 | Gemini | 96/97 |
+| Edge-case expansion | 97 | Gemini + Groq fallback | 97/97; fallback not used |
 
-Hallucination rate is 0.0% and missing-field recall is 1.0 on the recent runs. The dataset is
-synthetic and template-generated, and the edge cases were written to expose known defects, so
-these scores are a regression guard, not an estimate of real-world accuracy. Under a simulated
-Gemini outage, Groq served 14/14 cases with 100% field accuracy; the harness counted them as
-failed only because `review_required` is true by design in fallback mode. Full details are in
-`docs/architecture/evaluation-baseline.md`.
-
-### Original Golden Cases (v1)
-
-| Case | Scenario | Validation Focus |
-|---|---|---|
-| `restaurant_complete` | Complete commercial property submission | Full extraction of property and business interruption coverage |
-| `retail_incomplete` | Incomplete commercial property submission | Missing-field detection and human-review routing |
-| `warehouse_inconsistent` | Building year later than a prior fire claim | Deterministic temporal inconsistency detection |
-| `cyber_no_losses` | Cyber submission with explicitly reported no-loss history | Product classification and claims-history status |
-
-See `docs/architecture/evaluation-baseline.md` for the full history of recorded results.
+The 96/97 run included a transient provider error. In a separate simulated Gemini outage, Groq returned the expected field values on 14/14 cases, but the harness marked those cases as failures because fallback sets `review_required=true` by design. These are regression results on synthetic data, not estimates of real-world accuracy. See the [evaluation baseline](docs/architecture/evaluation-baseline.md).
 
 ## Quality Checks
 
@@ -488,58 +233,31 @@ uv run ruff check .
 uv run pytest
 ```
 
-Format the project locally:
-
-```bash
-uv run ruff format .
-```
-
-The GitHub Actions workflow runs formatting checks, linting, and tests on pushes and pull requests to `main`.
-
 ## Limitations
 
-- The golden dataset (97 cases) is synthetic and was written alongside the prompt, so scores are an optimistic baseline, not a measure of performance on real broker submissions. The 24 edge cases were written to expose known defects.
-- In fallback mode `review_required` is true by design, so the golden expectations (which assume the primary provider) count those runs as failures; a separate fallback expectation is not implemented yet.
-- Token usage, LLM call counts, and estimated cost are recorded per extraction in the log, but the evaluation runner does not report them per case, and it does not measure confidence calibration or retrieval quality.
-- Token and call counts exclude retries performed inside the provider SDKs, and a call that fails after the provider answered reports no usage.
-- End-to-end behavior with the Underwriting Agent (correlation ID propagation, review routing) is verified manually; there is no automated cross-project test. The Underwriting Agent does not yet map a complete extraction to its underwriting model.
-- The project does not perform document ingestion, OCR, or vector search itself (this is handled by Project 3).
-- Business-rule coverage is intentionally limited and does not represent an insurer's production underwriting rules.
-- `review_required` is a routing signal only; it does not yet pause a workflow for human approval.
-- The project does not make underwriting decisions, bind coverage, calculate premiums, or replace qualified insurance professionals.
-- All examples are synthetic and must not be interpreted as real insurance data or underwriting guidance.
+- The input is submission text, not a PDF, scanned document, or raw attachment.
+- The synthetic dataset was developed alongside the prompt. Multi-site examples exercise a single-location schema, not multi-location extraction.
+- `review_required` is a routing signal, not a human approval workflow owned by this service.
+- The fallback omission check covers selected fields only. It does not detect every wrong product line, insured name, or province.
+- Evaluation scores do not establish production accuracy or suitability for real underwriting.
 
 ## Position in the Insurance Agentic Platform
 
-This project is Project 1 of a five-project portfolio orchestrated locally through `insurance-agentic-platform`:
-
-| Project | Repository | Role |
-|---|---|---|
-| 1 | insurance-submission-extractor (this repo) | Structured submission intake and validation |
-| 2 | insurance-data-analyst-agent | Controlled portfolio analytics (loss ratio, deterministic SQL) |
-| 3 | insurance-rag-assistant | Insurance Knowledge Agent with grounded, cited retrieval |
-| 4 | underwriting-agent | Deterministic underwriting rules, risk scoring, pricing, and evidence retrieval |
-| — | insurance-agentic-platform | Docker Compose orchestration layer for the running services |
-
-## Recommended Technology Upgrades
-
-| Area | Current | Recommended (2026) | Benefit |
-|---|---|---|---|
-| LLM observability | No tracing | Langfuse (self-hosted, MIT) or OpenTelemetry | Full trace of cost, latency, and provider behavior per extraction |
-| Structured output generation | Manual prompt + JSON parsing | Pydantic AI or native structured-output modes | Fewer parsing failures, tighter schema guarantees at generation time |
-| Persistence | Timestamped JSON files in `data/evaluations/` | PostgreSQL with SQLAlchemy 2.0 async | Queryable audit history shared with the Data Analyst Agent |
-| API layer | Direct function calls in `api/app.py` | Dependency injection (`Depends()`) and repository pattern | Better testability and separation of concerns |
-| Evaluation | Field-by-field comparison only | Add LLM-as-a-judge scoring (Langfuse, Confident AI) | Detects semantic drift beyond exact-field matching |
-| Batch processing | Synchronous only | FastAPI `BackgroundTasks` or a lightweight queue (ARQ) | Enables bulk submission processing without blocking the API |
+| Project | Responsibility |
+|---|---|
+| Submission Extractor (this repo) | Candidate data extraction and validation |
+| [Data Analyst Agent](https://github.com/Kwame-K/insurance-data-analyst-agent) | Controlled portfolio analytics |
+| [Insurance Knowledge Agent](https://github.com/Kwame-K/insurance-rag-assistant) | Documentary evidence retrieval |
+| [Underwriting Agent](https://github.com/Kwame-K/underwriting-agent) | Deterministic underwriting and review workflow |
+| [Insurance Agentic Platform](https://github.com/Kwame-K/insurance-agentic-platform) | Local Docker Compose orchestration |
 
 ## Improvements and Next Steps
 
-1. Instrument `SubmissionExtractor.extract()` with tracing (Langfuse or OpenTelemetry) capturing provider, cost, latency, and retries for every run.
-2. Extend the golden dataset with anonymized or representative broker submissions (French-language and edge cases are already covered in v2).
-3. Expose the persisted extraction and evaluation history (SQLite/PostgreSQL, already implemented) to Project 2 for cross-project analytics.
-4. Add end-to-end integration tests that exercise the full `X-Correlation-ID` trace from this service through the Underwriting Agent.
-5. Introduce a per-request cost and retry budget in `config.py`, with explicit rejection when limits are exceeded.
-6. Formalize a versioned prompt-change process (changelog per prompt version) for `prompts/extraction_prompt.py`.
+- Expand the regression corpus and make fallback expectations explicit in the evaluation harness.
+- Extend tracing for latency, cost, and provider attempts.
+- Strengthen automated checks of correlation IDs, extraction mapping, and review routing across services.
+- Keep extraction history and evaluation reporting separate from downstream underwriting decisions.
+
 
 ## Agentic AI Best Practices Applied Here
 
